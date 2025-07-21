@@ -58,6 +58,25 @@
 - **📅 풀이 날짜**: 문제를 푼 날짜
 - **💭 풀이 과정**: (선택사항) 어려웠던 점이나 배운 점
 
+### 3️⃣ 제출 방법
+
+```bash
+# 1. 레포지토리 클론
+git clone https://github.com/[YOUR_USERNAME]/together-with-baekjun.git
+
+# 2. 브랜치 생성 (선택사항)
+git checkout -b solve/[문제번호]
+
+# 3. 문제 풀이 후 커밋
+git add .
+git commit -m "solve: 백준 [문제번호] [문제제목]"
+
+# 4. 푸시
+git push origin main
+
+# 5. GitHub에서 Pull Request 생성
+```
+
 ---
 
 ## 📊 진행 현황
