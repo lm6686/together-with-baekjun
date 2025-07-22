@@ -13,6 +13,6 @@
 
 ### 2025-07-22
 
-- [1000번 A+B](junho/1000) - Bronze V
 - [31403번 A + B - C](junho/31403) - Bronze IV
+- [1000번 A+B](junho/1000) - Bronze V
 

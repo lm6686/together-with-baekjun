@@ -13,7 +13,7 @@
 
 ### 2025-07-22
 
-- [1000번 A+B](hyosang/1000) - Bronze V
 - [10926번 ??!](hyosang/10926) - Bronze V
+- [1000번 A+B](hyosang/1000) - Bronze V
 - [4134번 다음 소수](hyosang/4134) - Silver IV
 
