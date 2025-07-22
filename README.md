@@ -58,18 +58,18 @@
   - 문제 번호 및 이름과 티어 **꼭 아래 형식을 맞출 것!**
   - 티어 이미지는 1번이 Bronze5, 이후 숫자 올라갈때마다 티어가 올라감 ex, <img src="https://static.solved.ac/tier_small/2.svg" width="16" height="16">
 
+  #### [#1000. A+B](https://www.acmicpc.net/problem/1000) <img src="https://static.solved.ac/tier_small/1.svg" width="16" height="16">
+
+```
   [#1000. A+B](https://www.acmicpc.net/problem/1000)
-  <img src="https://static.solved.ac/tier_small/1.svg" width="16" height="16">
+  <img src="https://static.solved.ac/tier_small/2.svg" width="16" height="16">
+```
 
 - **⏱️ 소요 시간**: 문제를 푸는데 걸린 시간
 - **🔄 시도 횟수**: 맞을 때까지 제출한 횟수
 - **🏷️ 문제 유형**: DP, 그래프, 탐색, 정렬, 구현 등
 - **📅 풀이 날짜**: 문제를 푼 날짜
 - **💭 풀이 과정**: (선택사항) 어려웠던 점이나 배운 점
-
-#### 📝 이름/README.md 필수 포함 내용:
-
-- **🏷️ 풀이 기록**: ex, 2025-07-21: 1000번 (A+B)
 
 ### 3️⃣ 제출 방법
 
