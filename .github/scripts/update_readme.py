@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+import os
+import re
+import json
+from datetime import datetime
+from pathlib import Path
+
+def get_problem_info_from_readme(readme_path):
+    """개별 문제 README에서 정보 추출"""
+    try:
+        with open(readme_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # 문제 번호와 제목 추출
+        title_match = re.search(r'#(\d+)\.\s*(.+?)\]', content)
+        if title_match:
+            problem_num = title_match.group(1)
+            problem_title = title_match.group(2)
+        else:
+            return None
+        
+        # 난이도 추출 (배지에서)
+        difficulty = "Unknown"
+        if "easy-brightgreen" in content:
+            difficulty = "Easy"
+        elif "medium-orange" in content:
+            difficulty = "Medium"
+        elif "hard-red" in content:
+            difficulty = "Hard"
+        
+        return {
+            'number': problem_num,
+            'title': problem_title,
+            'difficulty': difficulty
+        }
+    except:
+        return None
+
+def scan_user_folders():
+    """사용자 폴더들을 스캔하여 문제 정보 수집"""
+    base_path = Path('.')
+    users_data = {}
+    
+    for user_folder in base_path.iterdir():
+        if user_folder.is_dir() and not user_folder.name.startswith('.') and user_folder.name != 'README.md':
+            username = user_folder.name
+            users_data[username] = {
+                'problems': [],
+                'total_count': 0,
+                'last_update': None
+            }
+            
+            # 각 문제 폴더 스캔
+            for problem_folder in user_folder.iterdir():
+                if problem_folder.is_dir() and problem_folder.name.isdigit():
+                    problem_readme = problem_folder / 'README.md'
+                    if problem_readme.exists():
+                        problem_info = get_problem_info_from_readme(problem_readme)
+                        if problem_info:
+                            # Git에서 최근 수정 시간 가져오기
+                            try:
+                                import subprocess
+                                result = subprocess.run(
+                                    ['git', 'log', '-1', '--format=%ai', str(problem_readme)],
+                                    capture_output=True, text=True
+                                )
+                                if result.returncode == 0:
+                                    commit_date = result.stdout.strip()
+                                    problem_info['date'] = commit_date[:10]  # YYYY-MM-DD 형식
+                                else:
+                                    problem_info['date'] = datetime.now().strftime('%Y-%m-%d')
+                            except:
+                                problem_info['date'] = datetime.now().strftime('%Y-%m-%d')
+                            
+                            users_data[username]['problems'].append(problem_info)
+            
+            # 문제들을 날짜순으로 정렬
+            users_data[username]['problems'].sort(key=lambda x: x['date'])
+            users_data[username]['total_count'] = len(users_data[username]['problems'])
+            
+            if users_data[username]['problems']:
+                users_data[username]['last_update'] = users_data[username]['problems'][-1]['date']
+    
+    return users_data
+
+def update_user_readme(username, user_data):
+    """개별 사용자의 README 업데이트"""
+    readme_path = Path(username) / 'README.md'
+    
+    # README 내용 생성
+    content = f"""# 📚 {username}의 백준 스터디 기록
+
+> 🎯 **매일 꾸준히, 함께 성장하기!**
+
+---
+
+## 📅 풀이 기록
+
+"""
+    
+    # 문제 목록 추가
+    for problem in user_data['problems']:
+        rank_badge = ""
+        if "Bronze" in problem.get('difficulty', ''):
+            rank_badge = "Bronze"
+        elif "Silver" in problem.get('difficulty', ''):
+            rank_badge = "Silver"
+        elif "Gold" in problem.get('difficulty', ''):
+            rank_badge = "Gold"
+        
+        content += f"- {problem['date']}: {problem['number']}번 ({problem['title']})"
+        if rank_badge:
+            content += f" {rank_badge}"
+        content += "\n"
+    
+    content += f"""
+---
+
+**총 풀이 문제: {user_data['total_count']}개**
+"""
+    
+    if user_data['last_update']:
+        content += f"**마지막 업데이트: {user_data['last_update']}**\n"
+    
+    # 파일 쓰기
+    with open(readme_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+
+def update_main_readme(users_data):
+    """메인 README의 참여자 테이블 업데이트"""
+    readme_path = Path('README.md')
+    
+    if not readme_path.exists():
+        return
+    
+    with open(readme_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    # 참여자 테이블 생성
+    table_content = """| 이름 | 백준 ID | 풀이 문제 수 | 최근 활동 |
+|------|---------|-------------|-----------|
+"""
+    
+    for username, data in users_data.items():
+        last_activity = data['last_update'] if data['last_update'] else "-"
+        status = "🟢 활발" if data['total_count'] > 0 else "⚪ 준비중"
+        
+        table_content += f"| {username} | - | {data['total_count']}문제 | {last_activity} |\n"
+    
+    # 기존 테이블 교체 (정규식으로 찾아서 교체)
+    pattern = r'\| 이름 \| 백준 ID \| 진행률 \|.*?\n(?:\|.*?\n)*'
+    if re.search(pattern, content, re.MULTILINE):
+        content = re.sub(pattern, table_content, content, flags=re.MULTILINE)
+    else:
+        # 테이블이 없으면 참여자 섹션에 추가
+        participants_pattern = r'## 👥 참여자.*?(?=\n##|\n---|\Z)'
+        if re.search(participants_pattern, content, re.DOTALL):
+            replacement = f"## 👥 참여자\n\n{table_content}\n"
+            content = re.sub(participants_pattern, replacement, content, flags=re.DOTALL)
+    
+    # 진행 현황 업데이트
+    total_problems = sum(data['total_count'] for data in users_data.values())
+    today = datetime.now().strftime('%Y년 %m월 %d일')
+    
+    # 현재 진행 부분 업데이트
+    progress_pattern = r'📈 \*\*현재 진행\*\*:.*'
+    new_progress = f"📈 **현재 진행**: 총 {total_problems}문제 완료 ({today} 기준)"
+    content = re.sub(progress_pattern, new_progress, content)
+    
+    with open(readme_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+
+def main():
+    print("🔍 폴더 구조 스캔 중...")
+    users_data = scan_user_folders()
+    
+    print(f"📊 발견된 사용자: {list(users_data.keys())}")
+    
+    # 각 사용자의 README 업데이트
+    for username, user_data in users_data.items():
+        print(f"📝 {username}의 README 업데이트 중...")
+        update_user_readme(username, user_data)
+    
+    # 메인 README 업데이트
+    print("📋 메인 README 업데이트 중...")
+    update_main_readme(users_data)
+    
+    print("✅ README 업데이트 완료!")
+
+if __name__ == "__main__":
+    main()
