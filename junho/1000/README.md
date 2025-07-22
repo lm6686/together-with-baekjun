@@ -1,4 +1,6 @@
 [#1000. A+B](https://www.acmicpc.net/problem/1000)
+<img src="https://static.solved.ac/tier_small/1.svg" width="16" height="16">
+
 ![solve](https://img.shields.io/badge/solve-success-brightgreen)
 ![trial](https://img.shields.io/badge/trial-at%20once-green)
 ![difficulty](https://img.shields.io/badge/difficulty-easy-brightgreen)
@@ -8,9 +10,6 @@
 ## 📍 문제 정보
 
 - **문제 번호**: 1000번
-- **문제 제목**: A+B
-- **문제 링크**: https://www.acmicpc.net/problem/1000
-- **문제 랭크**: Bronze V
 - **🏷️ 문제 유형**: 수학, 구현, 사칙연산
 
 ---
