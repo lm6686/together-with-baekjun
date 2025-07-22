@@ -30,6 +30,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install PyYAML
+          # Ubuntu에서 timezone 데이터 업데이트 (zoneinfo 사용을 위해)
+          sudo apt-get update && sudo apt-get install -y tzdata
 
       - name: Update personal README
         run: python .github/scripts/update_readme.py

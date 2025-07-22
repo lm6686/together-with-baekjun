@@ -2,6 +2,18 @@
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+# 한국 시간대 설정
+KST = ZoneInfo('Asia/Seoul')
+
+def get_korea_now():
+    """한국 시간 기준 현재 시간 반환"""
+    return datetime.now(KST)
+
+def get_korea_today():
+    """한국 시간 기준 오늘 날짜 반환"""
+    return get_korea_now().date()
 
 def get_problem_info_from_readme(readme_path):
     """개별 문제 README에서 정보 추출"""
@@ -106,17 +118,18 @@ def scan_user_folders():
                                     # 커밋 시간을 파싱
                                     commit_datetime = datetime.fromisoformat(commit_datetime_str.replace(' +', '+'))
                                     
-                                    # 오전 4시 이전이면 전날로 처리
-                                    if commit_datetime.hour < 4:
-                                        commit_date = (commit_datetime.date() - timedelta(days=1)).strftime('%Y-%m-%d')
+                                    # 오전 4시 이전이면 전날로 처리 (한국 시간 기준)
+                                    commit_datetime_kst = commit_datetime.astimezone(KST)
+                                    if commit_datetime_kst.hour < 4:
+                                        commit_date = (commit_datetime_kst.date() - timedelta(days=1)).strftime('%Y-%m-%d')
                                     else:
-                                        commit_date = commit_datetime.date().strftime('%Y-%m-%d')
+                                        commit_date = commit_datetime_kst.date().strftime('%Y-%m-%d')
                                     
                                     problem_info['date'] = commit_date
                                 else:
-                                    problem_info['date'] = datetime.now().strftime('%Y-%m-%d')
+                                    problem_info['date'] = get_korea_now().strftime('%Y-%m-%d')
                             except:
-                                problem_info['date'] = datetime.now().strftime('%Y-%m-%d')
+                                problem_info['date'] = get_korea_now().strftime('%Y-%m-%d')
                             
                             users_data[username]['problems'].append(problem_info)
             
@@ -148,12 +161,12 @@ def calculate_missing_weekdays(problems):
     if not problem_dates:
         return 0, 0, []
     
-    # 첫 번째 문제 날짜부터 오늘까지 (오늘 한 건 성공에 포함!)
+    # 첫 번째 문제 날짜부터 오늘까지 (한국 시간 기준)
     start_date = min(problem_dates)
-    end_date = date.today()
+    end_date = get_korea_today()
     
     # 시작일이 오늘 이후면 아직 계산할 게 없음
-    if start_date > date.today():
+    if start_date > get_korea_today():
         return 0, 0, []
     
     # 평일 날짜들 생성 (월~금)
@@ -165,7 +178,7 @@ def calculate_missing_weekdays(problems):
         current_date += timedelta(days=1)
     
     # 빼먹은 평일들 (오늘은 아직 할 수 있으니 제외)
-    today = date.today()
+    today = get_korea_today()
     missing_weekdays = []
     for day in weekdays:
         if day not in problem_dates and day != today:  # 오늘은 빼먹은 날에서 제외
@@ -286,40 +299,33 @@ def update_main_readme(users_data):
         content = f.read()
     
     # 전체 스터디 통계 계산 (개별 사용자 통계 사용)
-    if users_data:
-        # 모든 사용자의 첫 문제 날짜 중 가장 빠른 날
-        all_first_dates = []
-        total_problems_all = 0
-        total_success_days_all = 0
-        total_missing_days_all = 0
-        
-        for username, data in users_data.items():
-            if data['problems'] and 'stats' in data:
-                first_date = data['stats']['first_date']
-                if first_date:
-                    all_first_dates.append(datetime.strptime(first_date, '%Y-%m-%d').date())
-                
-                total_problems_all += data['total_count']
-                total_success_days_all += data['stats']['success_days']
-                total_missing_days_all += data['stats']['failure_days']
-        
-        if all_first_dates:
-            study_start_date = min(all_first_dates).strftime('%Y-%m-%d')
+    all_first_dates = []
+    total_problems_all = 0
+    
+    for username, data in users_data.items():
+        if data['problems'] and 'stats' in data:
+            first_date = data['stats']['first_date']
+            if first_date:
+                all_first_dates.append(datetime.strptime(first_date, '%Y-%m-%d').date())
             
-            # 전체 도전 기간 계산
-            from datetime import date
-            start_date = min(all_first_dates)
-            end_date = date.today()
-            
-            total_weekdays_all = 0
-            current_date = start_date
-            while current_date <= end_date:
-                if current_date.weekday() < 5:  # 평일만
-                    total_weekdays_all += 1
-                current_date += timedelta(days=1)
-        else:
-            study_start_date = "아직 시작 안함"
-            total_weekdays_all = 0
+            total_problems_all += data['total_count']
+    
+    if all_first_dates:
+        study_start_date = min(all_first_dates).strftime('%Y-%m-%d')
+        
+        # 전체 도전 기간 계산 (한국 시간 기준)
+        start_date = min(all_first_dates)
+        end_date = get_korea_today()
+        
+        total_weekdays_all = 0
+        current_date = start_date
+        while current_date <= end_date:
+            if current_date.weekday() < 5:  # 평일만
+                total_weekdays_all += 1
+            current_date += timedelta(days=1)
+    else:
+        study_start_date = "아직 시작 안함"
+        total_weekdays_all = 0
     
     # 참여자 테이블 생성 (개인별 상세 통계 포함)
     table_content = """| 이름 | 시작일 | 풀이 문제 수 | 성공한 날 | 실패한 날 | 출석률 | 최근 활동 |
@@ -341,23 +347,21 @@ def update_main_readme(users_data):
         else:
             table_content += f"| {username} | - | 0문제 | 0일 | 0일 | - | {last_activity} |\n"
     
-    # 기존 테이블 교체 (정규식으로 찾아서 교체)
-    pattern = r'\| 이름 \|.*?\|.*?\n(?:\|.*?\n)*'
-    if re.search(pattern, content, re.MULTILINE):
-        content = re.sub(pattern, table_content, content, flags=re.MULTILINE)
-    else:
-        # 테이블이 없으면 참여자 섹션에 추가
-        participants_pattern = r'## 👥 참여자.*?(?=\n##|\n---|\Z)'
-        if re.search(participants_pattern, content, re.DOTALL):
-            replacement = f"## 👥 참여자\n\n{table_content}\n"
-            content = re.sub(participants_pattern, replacement, content, flags=re.DOTALL)
+    # 기존 참여자 섹션부터 끝까지 모든 자동 생성 콘텐츠 제거
+    participants_start_pattern = r'\n## 👥 참여자.*'
+    content = re.sub(participants_start_pattern + r'.*$', '', content, flags=re.DOTALL)
     
-    # 진행 현황 업데이트
-    today = datetime.now().strftime('%Y년 %m월 %d일')
+    # 진행 현황 업데이트 (한국 시간 기준)
+    today_str = get_korea_now().strftime('%Y년 %m월 %d일')
     
-    # 기존 진행 현황 부분을 전체 통계로 교체
+    # 새로운 섹션 생성
     if users_data and all_first_dates:
-        stats_content = f"""## 📊 전체 스터디 통계
+        new_section = f"""
+
+## 👥 참여자
+
+{table_content}
+## 📊 전체 스터디 통계
 
 - **📅 스터디 시작일**: {study_start_date}
 - **📈 총 풀이 문제**: {total_problems_all}개
@@ -368,9 +372,15 @@ def update_main_readme(users_data):
 
 ## 📈 진행 현황
 
-- **현재 진행**: 총 {total_problems_all}문제 완료 ({today} 기준)"""
+- **현재 진행**: 총 {total_problems_all}문제 완료 ({today_str} 기준)
+"""
     else:
-        stats_content = f"""## 📊 전체 스터디 통계
+        new_section = f"""
+
+## 👥 참여자
+
+{table_content}
+## 📊 전체 스터디 통계
 
 - **📊 아직 문제를 푼 참여자가 없습니다.**
 
@@ -378,37 +388,35 @@ def update_main_readme(users_data):
 
 ## 📈 진행 현황
 
-- **현재 진행**: 스터디 준비 중 ({today} 기준)"""
+- **현재 진행**: 스터디 준비 중 ({today_str} 기준)
+"""
     
-    # 진행 현황 섹션 교체
-    progress_pattern = r'## 📊 진행 현황.*?(?=\n##|\n---|\Z)'
-    if re.search(progress_pattern, content, re.DOTALL):
-        content = re.sub(progress_pattern, stats_content, content, flags=re.DOTALL)
-    else:
-        # 진행 현황이 없으면 참여자 섹션 뒤에 추가
-        participants_end_pattern = r'(## 👥 참여자.*?\n(?:\|.*?\n)*)'
-        if re.search(participants_end_pattern, content, re.DOTALL):
-            content = re.sub(participants_end_pattern, f'\\1\n{stats_content}\n', content, flags=re.DOTALL)
+    # 새로운 섹션 추가
+    content += new_section
     
     with open(readme_path, 'w', encoding='utf-8') as f:
         f.write(content)
 
 def main():
     print("🔍 폴더 구조 스캔 중...")
-    users_data = scan_user_folders()
-    
-    print(f"📊 발견된 사용자: {list(users_data.keys())}")
-    
-    # 각 사용자의 README 업데이트
-    for username, user_data in users_data.items():
-        print(f"📝 {username}의 README 업데이트 중...")
-        update_user_readme(username, user_data)
-    
-    # 메인 README 업데이트
-    print("📋 메인 README 업데이트 중...")
-    update_main_readme(users_data)
-    
-    print("✅ README 업데이트 완료!")
+    try:
+        users_data = scan_user_folders()
+        print(f"📊 발견된 사용자: {list(users_data.keys())}")
+        
+        # 각 사용자의 README 업데이트
+        for username, user_data in users_data.items():
+            print(f"📝 {username}의 README 업데이트 중...")
+            update_user_readme(username, user_data)
+        
+        # 메인 README 업데이트
+        print("📋 메인 README 업데이트 중...")
+        update_main_readme(users_data)
+        
+        print("✅ README 업데이트 완료!")
+    except Exception as e:
+        print(f"❌ 에러 발생: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()
