@@ -1,19 +1,62 @@
 #!/usr/bin/env python3
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
-# 한국 시간대 설정
-KST = ZoneInfo('Asia/Seoul')
+# 한국 시간대 설정 (GitHub Actions 호환성)
+try:
+    from zoneinfo import ZoneInfo
+    KST = ZoneInfo('Asia/Seoul')
+    print("✅ zoneinfo 사용")
+except ImportError:
+    # zoneinfo 없는 경우 fallback
+    print("⚠️ zoneinfo 없음, UTC+9 직접 계산 사용")
+    KST = None
+except:
+    # 완전 fallback - UTC+9 시간 직접 계산
+    print("⚠️ 시간대 라이브러리 없음, UTC+9 직접 계산 사용")
+    KST = None
 
 def get_korea_now():
-    """한국 시간 기준 현재 시간 반환"""
-    return datetime.now(KST)
+    """GitHub Actions 환경 호환 한국 시간 가져오기"""
+    utc_now = datetime.utcnow()
+    print(f"🕐 UTC 시간: {utc_now}")
+    
+    if KST is None:
+        # 직접 UTC+9 계산
+        korea_now = utc_now + timedelta(hours=9)
+        print(f"🇰🇷 한국 시간 (UTC+9): {korea_now}")
+    else:
+        # 한국 시간대로 변환
+        korea_now = utc_now.replace(tzinfo=timezone.utc).astimezone(KST).replace(tzinfo=None)
+        print(f"🇰🇷 한국 시간 (시간대): {korea_now}")
+    
+    return korea_now
+
+def get_korea_today():
+    """GitHub Actions 환경 호환 한국 오늘 날짜 가져오기"""
+    korea_now = get_korea_now()
+    today = korea_now.date()
+    print(f"📅 한국 오늘: {today}")
+    return today
 
 def get_korea_today():
     """한국 시간 기준 오늘 날짜 반환"""
     return get_korea_now().date()
+
+def convert_to_korea_time(dt):
+    """datetime을 한국 시간으로 변환"""
+    if KST:
+        return dt.astimezone(KST)
+    else:
+        # UTC+9 직접 계산
+        if dt.tzinfo is None:
+            # naive datetime은 UTC로 가정
+            return dt + timedelta(hours=9)
+        else:
+            # timezone 정보가 있는 경우 UTC로 변환 후 +9
+            utc_dt = dt.astimezone(datetime.timezone.utc)
+            return utc_dt.replace(tzinfo=None) + timedelta(hours=9)
 
 def get_problem_info_from_readme(readme_path):
     """개별 문제 README에서 정보 추출"""
@@ -125,20 +168,31 @@ def scan_user_folders():
                                     else:
                                         commit_date = commit_datetime_kst.date().strftime('%Y-%m-%d')
                                     
+                                    # 디버깅 정보 출력
+                                    print(f"🔍 {problem_info['number']}번: 커밋시간 {first_commit} -> 한국시간 {commit_datetime_kst} -> 날짜 {commit_date}")
+                                    
                                     problem_info['date'] = commit_date
                                 else:
                                     problem_info['date'] = get_korea_now().strftime('%Y-%m-%d')
-                            except:
+                                    print(f"⚠️ {problem_info['number']}번: Git 로그 없음, 현재 날짜 사용 {problem_info['date']}")
+                            except Exception as e:
                                 problem_info['date'] = get_korea_now().strftime('%Y-%m-%d')
+                                print(f"❌ {problem_info['number']}번: Git 오류 {e}, 현재 날짜 사용 {problem_info['date']}")
                             
                             users_data[username]['problems'].append(problem_info)
             
-            # 문제들을 날짜순으로 정렬
-            users_data[username]['problems'].sort(key=lambda x: x['date'])
-            users_data[username]['total_count'] = len(users_data[username]['problems'])
-            
-            if users_data[username]['problems']:
-                users_data[username]['last_update'] = users_data[username]['problems'][-1]['date']
+        # 문제들을 날짜순으로 정렬
+        users_data[username]['problems'].sort(key=lambda x: x['date'])
+        users_data[username]['total_count'] = len(users_data[username]['problems'])
+        
+        # 디버깅 정보
+        if users_data[username]['problems']:
+            print(f"📊 {username}: {len(users_data[username]['problems'])}문제, 시작일 {users_data[username]['problems'][0]['date']}")
+            for p in users_data[username]['problems']:
+                print(f"  - {p['date']}: {p['number']}번 {p['title']}")
+        
+        if users_data[username]['problems']:
+            users_data[username]['last_update'] = users_data[username]['problems'][-1]['date']
     
     return users_data
 

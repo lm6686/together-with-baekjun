@@ -27,6 +27,13 @@ jobs:
         with:
           python-version: "3.9"
 
+      - name: Set up timezone
+        run: |
+          # GitHub Actions 환경에서 한국 시간대 설정
+          sudo timedatectl set-timezone Asia/Seoul
+          echo "Current timezone: $(timedatectl show --property=Timezone --value)"
+          echo "Current time: $(date)"
+
       - name: Install dependencies
         run: |
           pip install PyYAML
@@ -34,7 +41,14 @@ jobs:
           sudo apt-get update && sudo apt-get install -y tzdata
 
       - name: Update personal README
-        run: python .github/scripts/update_readme.py
+        run: |
+          echo "🔍 GitHub Actions 환경 정보:"
+          echo "시간대: $(timedatectl show --property=Timezone --value)"
+          echo "현재 시간: $(date)"
+          echo "Git 설정 확인:"
+          git config --list | grep -E "(user|core)" || true
+          echo "🚀 README 업데이트 실행:"
+          python .github/scripts/update_readme.py
 
       - name: Commit changes
         run: |
