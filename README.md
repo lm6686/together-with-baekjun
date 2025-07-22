@@ -28,7 +28,7 @@
 
 ```
 📁 이름/
-├──📁 README.md
+├── 📝 README.md
 └── 📁 문제번호/
     ├── 📄 solution.py (또는 .cpp, .java 등)
     └── 📝 README.md
@@ -39,6 +39,7 @@
 
 ```
 📁 금준호/
+├── 📝 README.md
 ├── 📁 1000/
 │   ├── 📄 solution.py
 │   └── 📝 README.md
