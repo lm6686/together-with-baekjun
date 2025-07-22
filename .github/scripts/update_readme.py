@@ -129,9 +129,56 @@ def scan_user_folders():
     
     return users_data
 
+def calculate_missing_weekdays(problems):
+    """첫 번째 문제부터 현재까지 빼먹은 평일 계산"""
+    if not problems:
+        return 0, 0, []
+    
+    from datetime import date, timedelta
+    
+    # 문제 날짜들을 date 객체로 변환
+    problem_dates = set()
+    for problem in problems:
+        try:
+            problem_date = datetime.strptime(problem['date'], '%Y-%m-%d').date()
+            problem_dates.add(problem_date)
+        except:
+            continue
+    
+    if not problem_dates:
+        return 0, 0, []
+    
+    # 첫 번째 문제 날짜부터 오늘까지 (오늘 한 건 성공에 포함!)
+    start_date = min(problem_dates)
+    end_date = date.today()
+    
+    # 시작일이 오늘 이후면 아직 계산할 게 없음
+    if start_date > date.today():
+        return 0, 0, []
+    
+    # 평일 날짜들 생성 (월~금)
+    weekdays = []
+    current_date = start_date
+    while current_date <= end_date:
+        if current_date.weekday() < 5:  # 0=월요일, 4=금요일
+            weekdays.append(current_date)
+        current_date += timedelta(days=1)
+    
+    # 빼먹은 평일들 (오늘은 아직 할 수 있으니 제외)
+    today = date.today()
+    missing_weekdays = []
+    for day in weekdays:
+        if day not in problem_dates and day != today:  # 오늘은 빼먹은 날에서 제외
+            missing_weekdays.append(day)
+    
+    return len(weekdays), len(missing_weekdays), missing_weekdays
+
 def update_user_readme(username, user_data):
     """개별 사용자의 README 업데이트"""
     readme_path = Path(username) / 'README.md'
+    
+    # 빼먹은 평일 계산
+    total_weekdays, missing_count, missing_dates = calculate_missing_weekdays(user_data['problems'])
     
     # README 내용 생성
     content = f"""# 📚 {username}의 백준 스터디 기록
@@ -152,6 +199,68 @@ def update_user_readme(username, user_data):
         if difficulty_display != "Unknown":
             content += f" {difficulty_display}"
         content += "\n"
+    
+    # 통계 섹션 추가
+    if user_data['problems']:
+        first_date = user_data['problems'][0]['date']
+        
+        # 실제로 문제를 푼 평일 계산
+        problem_dates = set()
+        for problem in user_data['problems']:
+            try:
+                problem_date = datetime.strptime(problem['date'], '%Y-%m-%d').date()
+                if problem_date.weekday() < 5:  # 평일만
+                    problem_dates.add(problem_date)
+            except:
+                continue
+        
+        actual_success_days = len(problem_dates)  # 실제로 문제를 푼 평일 수
+        total_evaluated_days = actual_success_days + missing_count  # 성공 + 실패 = 평가된 총 일수
+        success_rate = ((actual_success_days) / total_evaluated_days * 100) if total_evaluated_days > 0 else 0
+        
+        # 계산된 통계를 user_data에 저장 (전체 README에서 재사용)
+        user_data['stats'] = {
+            'first_date': first_date,
+            'total_weekdays': total_weekdays,
+            'success_days': actual_success_days,
+            'failure_days': missing_count,
+            'success_rate': success_rate
+        }
+        
+        content += f"""
+---
+
+## 📊 스터디 통계
+
+- **📅 시작일**: {first_date}
+- **📈 총 풀이 문제**: {user_data['total_count']}개
+- **⏱️ 도전 기간**: {total_weekdays}일째 도전 중!
+- **✅ 성공한 날**: {actual_success_days}일
+- **❌ 실패한 날**: {missing_count}일
+- **🎯 출석률**: {success_rate:.1f}%"""
+
+        if missing_dates and len(missing_dates) <= 10:  # 너무 많으면 표시하지 않음
+            missing_str = ", ".join([d.strftime('%m-%d') for d in missing_dates[-5:]])  # 최근 5개만
+            if len(missing_dates) > 5:
+                missing_str += f" (외 {len(missing_dates)-5}일)"
+            content += f"\n- **📝 최근 빼먹은 날**: {missing_str}"
+        
+        content += "\n"
+    else:
+        # 문제를 풀지 않은 경우 기본값 저장
+        user_data['stats'] = {
+            'first_date': None,
+            'total_weekdays': 0,
+            'success_days': 0,
+            'failure_days': 0,
+            'success_rate': 0
+        }
+        
+        content += f"""
+---
+
+**📊 아직 문제를 풀지 않았습니다. 첫 문제를 풀어보세요!**
+"""
     
     content += f"""
 ---
@@ -176,19 +285,63 @@ def update_main_readme(users_data):
     with open(readme_path, 'r', encoding='utf-8') as f:
         content = f.read()
     
-    # 참여자 테이블 생성
-    table_content = """| 이름 | 백준 ID | 풀이 문제 수 | 최근 활동 |
-|------|---------|-------------|-----------|
+    # 전체 스터디 통계 계산 (개별 사용자 통계 사용)
+    if users_data:
+        # 모든 사용자의 첫 문제 날짜 중 가장 빠른 날
+        all_first_dates = []
+        total_problems_all = 0
+        total_success_days_all = 0
+        total_missing_days_all = 0
+        
+        for username, data in users_data.items():
+            if data['problems'] and 'stats' in data:
+                first_date = data['stats']['first_date']
+                if first_date:
+                    all_first_dates.append(datetime.strptime(first_date, '%Y-%m-%d').date())
+                
+                total_problems_all += data['total_count']
+                total_success_days_all += data['stats']['success_days']
+                total_missing_days_all += data['stats']['failure_days']
+        
+        if all_first_dates:
+            study_start_date = min(all_first_dates).strftime('%Y-%m-%d')
+            
+            # 전체 도전 기간 계산
+            from datetime import date
+            start_date = min(all_first_dates)
+            end_date = date.today()
+            
+            total_weekdays_all = 0
+            current_date = start_date
+            while current_date <= end_date:
+                if current_date.weekday() < 5:  # 평일만
+                    total_weekdays_all += 1
+                current_date += timedelta(days=1)
+        else:
+            study_start_date = "아직 시작 안함"
+            total_weekdays_all = 0
+    
+    # 참여자 테이블 생성 (개인별 상세 통계 포함)
+    table_content = """| 이름 | 풀이 문제 수 | 성공한 날 | 실패한 날 | 출석률 | 최근 활동 |
+|------|-------------|----------|----------|--------|-----------|
 """
     
     for username, data in users_data.items():
         last_activity = data['last_update'] if data['last_update'] else "-"
-        status = "🟢 활발" if data['total_count'] > 0 else "⚪ 준비중"
         
-        table_content += f"| {username} | - | {data['total_count']}문제 | {last_activity} |\n"
+        if data['problems'] and 'stats' in data:
+            # 저장된 통계 사용
+            stats = data['stats']
+            success_days = stats['success_days']
+            failure_days = stats['failure_days']
+            attendance_rate = stats['success_rate']
+            
+            table_content += f"| {username} | {data['total_count']}문제 | {success_days}일 | {failure_days}일 | {attendance_rate:.1f}% | {last_activity} |\n"
+        else:
+            table_content += f"| {username} | 0문제 | 0일 | 0일 | - | {last_activity} |\n"
     
     # 기존 테이블 교체 (정규식으로 찾아서 교체)
-    pattern = r'\| 이름 \| 백준 ID \| 진행률 \|.*?\n(?:\|.*?\n)*'
+    pattern = r'\| 이름 \|.*?\|.*?\n(?:\|.*?\n)*'
     if re.search(pattern, content, re.MULTILINE):
         content = re.sub(pattern, table_content, content, flags=re.MULTILINE)
     else:
@@ -199,13 +352,42 @@ def update_main_readme(users_data):
             content = re.sub(participants_pattern, replacement, content, flags=re.DOTALL)
     
     # 진행 현황 업데이트
-    total_problems = sum(data['total_count'] for data in users_data.values())
     today = datetime.now().strftime('%Y년 %m월 %d일')
     
-    # 현재 진행 부분 업데이트
-    progress_pattern = r'📈 \*\*현재 진행\*\*:.*'
-    new_progress = f"📈 **현재 진행**: 총 {total_problems}문제 완료 ({today} 기준)"
-    content = re.sub(progress_pattern, new_progress, content)
+    # 기존 진행 현황 부분을 전체 통계로 교체
+    if users_data and all_first_dates:
+        stats_content = f"""## 📊 전체 스터디 통계
+
+- **📅 스터디 시작일**: {study_start_date}
+- **📈 총 풀이 문제**: {total_problems_all}개
+- **⏱️ 도전 기간**: {total_weekdays_all}일째 도전 중!
+- **👥 참여자 수**: {len(users_data)}명
+
+---
+
+## 📈 진행 현황
+
+- **현재 진행**: 총 {total_problems_all}문제 완료 ({today} 기준)"""
+    else:
+        stats_content = f"""## 📊 전체 스터디 통계
+
+- **📊 아직 문제를 푼 참여자가 없습니다.**
+
+---
+
+## 📈 진행 현황
+
+- **현재 진행**: 스터디 준비 중 ({today} 기준)"""
+    
+    # 진행 현황 섹션 교체
+    progress_pattern = r'## 📊 진행 현황.*?(?=\n##|\n---|\Z)'
+    if re.search(progress_pattern, content, re.DOTALL):
+        content = re.sub(progress_pattern, stats_content, content, flags=re.DOTALL)
+    else:
+        # 진행 현황이 없으면 참여자 섹션 뒤에 추가
+        participants_end_pattern = r'(## 👥 참여자.*?\n(?:\|.*?\n)*)'
+        if re.search(participants_end_pattern, content, re.DOTALL):
+            content = re.sub(participants_end_pattern, f'\\1\n{stats_content}\n', content, flags=re.DOTALL)
     
     with open(readme_path, 'w', encoding='utf-8') as f:
         f.write(content)
