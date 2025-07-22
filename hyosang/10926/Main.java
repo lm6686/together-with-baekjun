@@ -1,11 +1,10 @@
 import java.util.Scanner;
 
-class Main{
+class Q10926{
     public static void main(String[] args){
         Scanner scanner = new Scanner(System.in);
-        int i = scanner.nextInt();
-        int j = scanner.nextInt();
+        String s = scanner.nextLine();
         scanner.close();
-        System.out.println(i + j);
+        System.out.println(s + "??!");
     }
 }
