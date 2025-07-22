@@ -158,20 +158,46 @@ def scan_user_folders():
                                     # 첫 번째 라인이 가장 오래된 커밋
                                     first_commit = result.stdout.strip().split('\n')[0]
                                     commit_datetime_str = first_commit
-                                    # 커밋 시간을 파싱
-                                    commit_datetime = datetime.fromisoformat(commit_datetime_str.replace(' +', '+'))
                                     
-                                    # 오전 4시 이전이면 전날로 처리 (한국 시간 기준)
-                                    commit_datetime_kst = commit_datetime.astimezone(KST)
-                                    if commit_datetime_kst.hour < 4:
-                                        commit_date = (commit_datetime_kst.date() - timedelta(days=1)).strftime('%Y-%m-%d')
-                                    else:
-                                        commit_date = commit_datetime_kst.date().strftime('%Y-%m-%d')
-                                    
-                                    # 디버깅 정보 출력
-                                    print(f"🔍 {problem_info['number']}번: 커밋시간 {first_commit} -> 한국시간 {commit_datetime_kst} -> 날짜 {commit_date}")
-                                    
-                                    problem_info['date'] = commit_date
+                                    try:
+                                        # Git 커밋 시간 형식: '2025-07-22 00:45:46+0900'을 파싱
+                                        # '+0900' 형식을 '+09:00'으로 변환
+                                        if '+' in commit_datetime_str and commit_datetime_str.count(':') == 2:
+                                            # 시간대 부분을 올바른 형식으로 변환
+                                            datetime_part, tz_part = commit_datetime_str.rsplit('+', 1)
+                                            if len(tz_part) == 4:  # +0900 형식
+                                                tz_formatted = f"+{tz_part[:2]}:{tz_part[2:]}"  # +09:00 형식으로 변환
+                                                commit_datetime_str_formatted = f"{datetime_part}{tz_formatted}"
+                                            else:
+                                                commit_datetime_str_formatted = commit_datetime_str
+                                        else:
+                                            commit_datetime_str_formatted = commit_datetime_str
+                                        
+                                        # 커밋 시간을 파싱
+                                        commit_datetime = datetime.fromisoformat(commit_datetime_str_formatted)
+                                        
+                                        # 한국 시간으로 변환
+                                        if KST is None:
+                                            # UTC+9 직접 계산
+                                            commit_datetime_kst = commit_datetime.replace(tzinfo=None) + timedelta(hours=9)
+                                        else:
+                                            commit_datetime_kst = commit_datetime.astimezone(KST).replace(tzinfo=None)
+                                        
+                                        # 오전 4시 이전이면 전날로 처리 (한국 시간 기준)
+                                        if commit_datetime_kst.hour < 4:
+                                            commit_date = (commit_datetime_kst.date() - timedelta(days=1)).strftime('%Y-%m-%d')
+                                        else:
+                                            commit_date = commit_datetime_kst.date().strftime('%Y-%m-%d')
+                                        
+                                        # 디버깅 정보 출력
+                                        print(f"🔍 {problem_info['number']}번: 커밋시간 {first_commit} -> 한국시간 {commit_datetime_kst} -> 날짜 {commit_date}")
+                                        
+                                        problem_info['date'] = commit_date
+                                    except Exception as e:
+                                        # 파싱 오류 시 현재 날짜 사용
+                                        today = get_korea_today().strftime('%Y-%m-%d')
+                                        print(f"❌ {problem_info['number']}번: Git 오류 {e}, 현재 날짜 사용 {today}")
+                                        problem_info['date'] = today
                                 else:
                                     problem_info['date'] = get_korea_now().strftime('%Y-%m-%d')
                                     print(f"⚠️ {problem_info['number']}번: Git 로그 없음, 현재 날짜 사용 {problem_info['date']}")
