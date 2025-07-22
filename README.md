@@ -28,7 +28,7 @@
 
 ```
 📁 이름/
-├── 📝 README.md
+├── 📝 README.md - 자동 생성
 └── 📁 문제번호/
     ├── 📄 solution.py (또는 .cpp, .java 등)
     └── 📝 README.md
@@ -38,8 +38,8 @@
 **예시:**
 
 ```
-📁 금준호/
-├── 📝 README.md
+📁 junho/
+├── 📝 README.md - 자동 생성
 ├── 📁 1000/
 │   ├── 📄 solution.py
 │   └── 📝 README.md
