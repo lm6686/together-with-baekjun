@@ -123,6 +123,7 @@ git push origin main
 - 🔗 [백준 온라인 저지](https://www.acmicpc.net/)
 - 📚 [백준 길라잡이 베타](https://www.acmicpc.net/workbook/view/2418)
 - 🧠 [알고리즘 분류별 문제](https://www.acmicpc.net/problemset)
+- 🏆 [solved.ac - 랭크 확인](https://solved.ac/)
 
 ---
 
