@@ -92,15 +92,17 @@ def scan_user_folders():
                     if problem_readme.exists():
                         problem_info = get_problem_info_from_readme(problem_readme)
                         if problem_info:
-                            # Git에서 최근 수정 시간 가져오기
+                            # Git에서 첫 번째 커밋 시간 가져오기 (파일 생성 시점)
                             try:
                                 import subprocess
                                 result = subprocess.run(
-                                    ['git', 'log', '-1', '--format=%ai', str(problem_readme)],
+                                    ['git', 'log', '--follow', '--format=%ai', '--reverse', str(problem_readme)],
                                     capture_output=True, text=True
                                 )
-                                if result.returncode == 0:
-                                    commit_datetime_str = result.stdout.strip()
+                                if result.returncode == 0 and result.stdout.strip():
+                                    # 첫 번째 라인이 가장 오래된 커밋
+                                    first_commit = result.stdout.strip().split('\n')[0]
+                                    commit_datetime_str = first_commit
                                     # 커밋 시간을 파싱
                                     commit_datetime = datetime.fromisoformat(commit_datetime_str.replace(' +', '+'))
                                     
