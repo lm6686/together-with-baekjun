@@ -1,7 +1,6 @@
-# BOJ 4134번 - 다음 소수
-
 ## 📌 문제 링크
-[백준 4134번 - 다음 소수](https://www.acmicpc.net/problem/4134)
+
+[#4134. 다음 소수](https://www.acmicpc.net/problem/4134) <img src="https://static.solved.ac/tier_small/7.svg" width="16" height="16">
 
 ---
 
@@ -29,12 +28,10 @@
 20
 100
 
-
 **출력 예시**
 7
 23
 101
-
 
 ---
 

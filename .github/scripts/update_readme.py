@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-import os
 import re
-import json
 from datetime import datetime
 from pathlib import Path
 
@@ -12,21 +10,58 @@ def get_problem_info_from_readme(readme_path):
             content = f.read()
         
         # 문제 번호와 제목 추출
-        title_match = re.search(r'#(\d+)\.\s*(.+?)\]', content)
+        title_match = re.search(r'\[#(\d+)\.\s*(.+?)\]', content)
         if title_match:
             problem_num = title_match.group(1)
             problem_title = title_match.group(2)
         else:
             return None
         
-        # 난이도 추출 (배지에서)
-        difficulty = "Unknown"
-        if "easy-brightgreen" in content:
-            difficulty = "Easy"
-        elif "medium-orange" in content:
-            difficulty = "Medium"
-        elif "hard-red" in content:
-            difficulty = "Hard"
+        # 티어 이미지에서 난이도 추출
+        tier_match = re.search(r'tier_small/(\d+)\.svg', content)
+        if tier_match:
+            tier_num = int(tier_match.group(1))
+            # 티어 번호를 난이도로 변환
+            tier_names = [
+                'Unknown',          # 0
+                'Bronze V',         # 1
+                'Bronze IV',        # 2
+                'Bronze III',       # 3
+                'Bronze II',        # 4
+                'Bronze I',         # 5
+                'Silver V',         # 6
+                'Silver IV',        # 7
+                'Silver III',       # 8
+                'Silver II',        # 9
+                'Silver I',         # 10
+                'Gold V',           # 11
+                'Gold IV',          # 12
+                'Gold III',         # 13
+                'Gold II',          # 14
+                'Gold I',           # 15
+                'Platinum V',       # 16
+                'Platinum IV',      # 17
+                'Platinum III',     # 18
+                'Platinum II',      # 19
+                'Platinum I',       # 20
+                'Diamond V',        # 21
+                'Diamond IV',       # 22
+                'Diamond III',      # 23
+                'Diamond II',       # 24
+                'Diamond I',        # 25
+                'Ruby V',           # 26
+                'Ruby IV',          # 27
+                'Ruby III',         # 28
+                'Ruby II',          # 29
+                'Ruby I'            # 30
+            ]
+            
+            if 1 <= tier_num <= 30:
+                difficulty = tier_names[tier_num]
+            else:
+                difficulty = "Unknown"
+        else:
+            difficulty = "Unknown"
         
         return {
             'number': problem_num,
@@ -100,17 +135,11 @@ def update_user_readme(username, user_data):
     
     # 문제 목록 추가
     for problem in user_data['problems']:
-        rank_badge = ""
-        if "Bronze" in problem.get('difficulty', ''):
-            rank_badge = "Bronze"
-        elif "Silver" in problem.get('difficulty', ''):
-            rank_badge = "Silver"
-        elif "Gold" in problem.get('difficulty', ''):
-            rank_badge = "Gold"
+        difficulty_display = problem.get('difficulty', 'Unknown')
         
         content += f"- {problem['date']}: {problem['number']}번 ({problem['title']})"
-        if rank_badge:
-            content += f" {rank_badge}"
+        if difficulty_display != "Unknown":
+            content += f" {difficulty_display}"
         content += "\n"
     
     content += f"""

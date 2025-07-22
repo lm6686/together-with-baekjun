@@ -54,9 +54,13 @@
 #### 📝 문제번호/README.md 필수 포함 내용:
 
 - **📍 문제 정보**
-  - 문제 번호 및 제목과 내용
-  - 문제 랭크 (Bronze, Silver, Gold, Platinum, Diamond, Ruby)
-  - 입출력 예시
+
+  - 문제 번호 및 이름과 티어 **꼭 아래 형식을 맞출 것!**
+  - 티어 이미지는 1번이 Bronze5, 이후 숫자 올라갈때마다 티어가 올라감 ex, <img src="https://static.solved.ac/tier_small/2.svg" width="16" height="16">
+
+  [#1000. A+B](https://www.acmicpc.net/problem/1000)
+  <img src="https://static.solved.ac/tier_small/1.svg" width="16" height="16">
+
 - **⏱️ 소요 시간**: 문제를 푸는데 걸린 시간
 - **🔄 시도 횟수**: 맞을 때까지 제출한 횟수
 - **🏷️ 문제 유형**: DP, 그래프, 탐색, 정렬, 구현 등
