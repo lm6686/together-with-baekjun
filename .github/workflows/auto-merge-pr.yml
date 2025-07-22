@@ -1,0 +1,207 @@
+name: Auto Merge PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+jobs:
+  validate-and-merge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Get PR author
+        id: pr-info
+        run: |
+          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          echo "pr_author=$PR_AUTHOR" >> $GITHUB_OUTPUT
+          echo "PR 작성자: $PR_AUTHOR"
+
+      - name: Get changed files
+        id: changed-files
+        run: |
+          # PR에서 변경된 파일들 가져오기
+          git diff --name-only origin/main..HEAD > changed_files.txt
+          echo "변경된 파일들:"
+          cat changed_files.txt
+          
+          # 변경된 파일들을 환경 변수로 저장
+          CHANGED_FILES=$(cat changed_files.txt | tr '\n' ' ')
+          echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+
+      - name: Validate changes
+        id: validate
+        run: |
+          PR_AUTHOR="${{ steps.pr-info.outputs.pr_author }}"
+          CHANGED_FILES="${{ steps.changed-files.outputs.changed_files }}"
+          
+          echo "🔍 PR 검증 시작..."
+          echo "PR 작성자: $PR_AUTHOR"
+          echo "변경된 파일들: $CHANGED_FILES"
+          
+          # 검증 규칙
+          VALID=true
+          REASON=""
+          
+          # 1. 변경된 파일이 있는지 확인
+          if [ -z "$CHANGED_FILES" ]; then
+            VALID=false
+            REASON="변경된 파일이 없습니다."
+          fi
+          
+          # 2. 각 변경된 파일이 해당 사용자 폴더 내에 있는지 확인
+          for file in $CHANGED_FILES; do
+            echo "검사 중인 파일: $file"
+            
+            # 루트 파일들은 허용하지 않음 (README.md, .github 등)
+            if [[ "$file" == *.md ]] && [[ "$file" != */* ]]; then
+              VALID=false
+              REASON="루트 디렉토리의 파일 ($file) 수정은 허용되지 않습니다."
+              break
+            fi
+            
+            if [[ "$file" == .github/* ]]; then
+              VALID=false
+              REASON=".github 디렉토리 수정은 허용되지 않습니다."
+              break
+            fi
+            
+            # 사용자 폴더 내 파일인지 확인
+            if [[ "$file" == */* ]]; then
+              FOLDER_NAME=$(echo "$file" | cut -d'/' -f1)
+              
+              # 폴더명이 PR 작성자와 일치하는지 확인
+              if [ "$FOLDER_NAME" != "$PR_AUTHOR" ]; then
+                VALID=false
+                REASON="다른 사용자의 폴더 ($FOLDER_NAME) 수정은 허용되지 않습니다. 본인의 폴더 ($PR_AUTHOR)만 수정 가능합니다."
+                break
+              fi
+              
+              # 허용되는 파일 형식인지 확인 (선택적)
+              if [[ "$file" == *README.md ]] || [[ "$file" == *.py ]] || [[ "$file" == *.cpp ]] || [[ "$file" == *.java ]] || [[ "$file" == *.js ]] || [[ "$file" == *.c ]]; then
+                echo "✅ 허용되는 파일: $file"
+              else
+                echo "⚠️ 알 수 없는 파일 형식이지만 허용: $file"
+              fi
+            else
+              VALID=false
+              REASON="폴더 구조를 따르지 않는 파일입니다: $file"
+              break
+            fi
+          done
+          
+          # 3. 최소 하나의 문제 폴더가 있는지 확인
+          PROBLEM_FOLDERS=$(echo "$CHANGED_FILES" | tr ' ' '\n' | grep "^$PR_AUTHOR/[0-9]" | head -1)
+          if [ -z "$PROBLEM_FOLDERS" ] && [ "$VALID" = "true" ]; then
+            VALID=false
+            REASON="문제 번호 폴더가 포함되지 않았습니다. (예: $PR_AUTHOR/1000/)"
+          fi
+          
+          echo "valid=$VALID" >> $GITHUB_OUTPUT
+          echo "reason=$REASON" >> $GITHUB_OUTPUT
+          
+          if [ "$VALID" = "true" ]; then
+            echo "✅ PR 검증 통과!"
+          else
+            echo "❌ PR 검증 실패: $REASON"
+          fi
+
+      - name: Comment on PR if validation fails
+        if: steps.validate.outputs.valid == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const reason = '${{ steps.validate.outputs.reason }}';
+            const prAuthor = '${{ steps.pr-info.outputs.pr_author }}';
+            
+            const comment = `❌ **PR 자동 검증 실패**
+            
+            **실패 사유:** ${reason}
+            
+            **규칙:**
+            1. 본인의 폴더(\`${prAuthor}/\`)에 있는 파일만 수정 가능합니다
+            2. 문제 번호 폴더(예: \`${prAuthor}/1000/\`)가 포함되어야 합니다
+            3. 루트 파일이나 다른 사용자 폴더 수정은 불가합니다
+            4. \`.github\` 폴더 수정은 불가합니다
+            
+            **수정 후 다시 푸시해주세요!** 🔄`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Comment on PR if validation passes
+        if: steps.validate.outputs.valid == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prAuthor = '${{ steps.pr-info.outputs.pr_author }}';
+            const changedFiles = '${{ steps.changed-files.outputs.changed_files }}';
+            
+            const comment = `✅ **PR 자동 검증 통과!**
+            
+            **검증된 내용:**
+            - 작성자: ${prAuthor}
+            - 수정된 파일들: ${changedFiles}
+            
+            모든 규칙을 만족하여 자동으로 머지됩니다. 🎉`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Auto approve PR
+        if: steps.validate.outputs.valid == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              event: 'APPROVE',
+              body: '🤖 자동 승인: 모든 검증 규칙을 만족합니다!'
+            });
+
+      - name: Auto merge PR
+        if: steps.validate.outputs.valid == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                commit_title: `Auto-merge: ${context.payload.pull_request.title}`,
+                commit_message: `자동 머지됨 - ${{ steps.pr-info.outputs.pr_author }}의 문제 풀이`,
+                merge_method: 'squash'
+              });
+              console.log('✅ PR이 성공적으로 머지되었습니다!');
+            } catch (error) {
+              console.log('❌ 머지 실패:', error.message);
+              
+              // 머지 실패 시 코멘트 추가
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `❌ **자동 머지 실패**\n\n오류: ${error.message}\n\n수동으로 머지해주세요.`
+              });
+            }
