@@ -183,7 +183,7 @@ def update_user_readme(username, user_data):
     # README 내용 생성
     content = f"""# 📚 {username}의 백준 스터디 기록
 
-> 🎯 **매일 꾸준히, 함께 성장하기!**
+> 🎯 **매일 꾸준히 성장하기!**
 
 ---
 
@@ -322,8 +322,8 @@ def update_main_readme(users_data):
             total_weekdays_all = 0
     
     # 참여자 테이블 생성 (개인별 상세 통계 포함)
-    table_content = """| 이름 | 풀이 문제 수 | 성공한 날 | 실패한 날 | 출석률 | 최근 활동 |
-|------|-------------|----------|----------|--------|-----------|
+    table_content = """| 이름 | 시작일 | 풀이 문제 수 | 성공한 날 | 실패한 날 | 출석률 | 최근 활동 |
+|------|--------|-------------|----------|----------|--------|-----------|
 """
     
     for username, data in users_data.items():
@@ -332,13 +332,14 @@ def update_main_readme(users_data):
         if data['problems'] and 'stats' in data:
             # 저장된 통계 사용
             stats = data['stats']
+            start_date = stats['first_date']
             success_days = stats['success_days']
             failure_days = stats['failure_days']
             attendance_rate = stats['success_rate']
             
-            table_content += f"| {username} | {data['total_count']}문제 | {success_days}일 | {failure_days}일 | {attendance_rate:.1f}% | {last_activity} |\n"
+            table_content += f"| {username} | {start_date} | {data['total_count']}문제 | {success_days}일 | {failure_days}일 | {attendance_rate:.1f}% | {last_activity} |\n"
         else:
-            table_content += f"| {username} | 0문제 | 0일 | 0일 | - | {last_activity} |\n"
+            table_content += f"| {username} | - | 0문제 | 0일 | 0일 | - | {last_activity} |\n"
     
     # 기존 테이블 교체 (정규식으로 찾아서 교체)
     pattern = r'\| 이름 \|.*?\|.*?\n(?:\|.*?\n)*'
