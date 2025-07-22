@@ -42,12 +42,6 @@ jobs:
 
       - name: Update personal README
         run: |
-          echo "🔍 GitHub Actions 환경 정보:"
-          echo "시간대: $(timedatectl show --property=Timezone --value)"
-          echo "현재 시간: $(date)"
-          echo "Git 설정 확인:"
-          git config --list | grep -E "(user|core)" || true
-          echo "🚀 README 업데이트 실행:"
           python .github/scripts/update_readme.py
 
       - name: Commit changes
