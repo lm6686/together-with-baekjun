@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 def get_problem_info_from_readme(readme_path):
@@ -100,8 +100,17 @@ def scan_user_folders():
                                     capture_output=True, text=True
                                 )
                                 if result.returncode == 0:
-                                    commit_date = result.stdout.strip()
-                                    problem_info['date'] = commit_date[:10]  # YYYY-MM-DD 형식
+                                    commit_datetime_str = result.stdout.strip()
+                                    # 커밋 시간을 파싱
+                                    commit_datetime = datetime.fromisoformat(commit_datetime_str.replace(' +', '+'))
+                                    
+                                    # 오전 4시 이전이면 전날로 처리
+                                    if commit_datetime.hour < 4:
+                                        commit_date = (commit_datetime.date() - timedelta(days=1)).strftime('%Y-%m-%d')
+                                    else:
+                                        commit_date = commit_datetime.date().strftime('%Y-%m-%d')
+                                    
+                                    problem_info['date'] = commit_date
                                 else:
                                     problem_info['date'] = datetime.now().strftime('%Y-%m-%d')
                             except:
