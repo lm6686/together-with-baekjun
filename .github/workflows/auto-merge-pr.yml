@@ -34,7 +34,7 @@ jobs:
           git diff --name-only origin/main..HEAD > changed_files.txt
           echo "변경된 파일들:"
           cat changed_files.txt
-          
+
           # 변경된 파일들을 환경 변수로 저장
           CHANGED_FILES=$(cat changed_files.txt | tr '\n' ' ')
           echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
@@ -44,21 +44,21 @@ jobs:
         run: |
           PR_AUTHOR="${{ steps.pr-info.outputs.pr_author }}"
           CHANGED_FILES="${{ steps.changed-files.outputs.changed_files }}"
-          
+
           echo "🔍 PR 검증 시작..."
           echo "PR 작성자: $PR_AUTHOR"
           echo "변경된 파일들: $CHANGED_FILES"
-          
+
           # 검증 규칙
           VALID=true
           REASON=""
-          
+
           # 1. 변경된 파일이 있는지 확인
           if [ -z "$CHANGED_FILES" ]; then
             VALID=false
             REASON="변경된 파일이 없습니다."
           fi
-          
+
           # 2. 각 변경된 파일이 해당 사용자 폴더 내에 있는지 확인
           for file in $CHANGED_FILES; do
             echo "검사 중인 파일: $file"
@@ -99,17 +99,17 @@ jobs:
               break
             fi
           done
-          
+
           # 3. 최소 하나의 문제 폴더가 있는지 확인
           PROBLEM_FOLDERS=$(echo "$CHANGED_FILES" | tr ' ' '\n' | grep "^$PR_AUTHOR/[0-9]" | head -1)
           if [ -z "$PROBLEM_FOLDERS" ] && [ "$VALID" = "true" ]; then
             VALID=false
             REASON="문제 번호 폴더가 포함되지 않았습니다. (예: $PR_AUTHOR/1000/)"
           fi
-          
+
           echo "valid=$VALID" >> $GITHUB_OUTPUT
           echo "reason=$REASON" >> $GITHUB_OUTPUT
-          
+
           if [ "$VALID" = "true" ]; then
             echo "✅ PR 검증 통과!"
           else
@@ -123,19 +123,19 @@ jobs:
           script: |
             const reason = '${{ steps.validate.outputs.reason }}';
             const prAuthor = '${{ steps.pr-info.outputs.pr_author }}';
-            
+
             const comment = `❌ **PR 자동 검증 실패**
-            
+
             **실패 사유:** ${reason}
-            
+
             **규칙:**
             1. 본인의 폴더(\`${prAuthor}/\`)에 있는 파일만 수정 가능합니다
             2. 문제 번호 폴더(예: \`${prAuthor}/1000/\`)가 포함되어야 합니다
             3. 루트 파일이나 다른 사용자 폴더 수정은 불가합니다
             4. \`.github\` 폴더 수정은 불가합니다
-            
+
             **수정 후 다시 푸시해주세요!** 🔄`;
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -150,15 +150,15 @@ jobs:
           script: |
             const prAuthor = '${{ steps.pr-info.outputs.pr_author }}';
             const changedFiles = '${{ steps.changed-files.outputs.changed_files }}';
-            
+
             const comment = `✅ **PR 자동 검증 통과!**
-            
+
             **검증된 내용:**
             - 작성자: ${prAuthor}
             - 수정된 파일들: ${changedFiles}
-            
+
             모든 규칙을 만족하여 자동으로 머지됩니다. 🎉`;
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
