@@ -27,19 +27,29 @@ jobs:
           fetch-depth: 0
           # 주의: 외부 PR의 코드가 아닌 메인 레포의 코드를 체크아웃
 
-      - name: Checkout PR changes (제한적 체크아웃)
+      - name: Install jq for JSON parsing
         run: |
-          # PR의 변경사항만 안전하게 가져오기
-          git fetch origin pull/${{ github.event.number }}/head:pr-${{ github.event.number }}
-          git checkout pr-${{ github.event.number }}
-
-          # base branch와 비교할 수 있도록 origin/main도 fetch
-          git fetch origin main:main
+          sudo apt-get update
+          sudo apt-get install -y jq
 
       - name: Security check - 워크플로우 파일 변경 확인
         run: |
+          # PR의 변경사항을 GitHub API로 가져와서 확인 (더 안전한 방법)
+          echo "PR 번호: ${{ github.event.number }}"
+          echo "Base SHA: ${{ github.event.pull_request.base.sha }}"
+          echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
+          
+          # GitHub API를 통해 PR의 변경된 파일 목록 가져오기
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               -H "Accept: application/vnd.github.v3+json" \
+               "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.number }}/files" \
+               | jq -r '.[].filename' > pr_changed_files.txt
+          
+          echo "PR에서 변경된 파일들:"
+          cat pr_changed_files.txt
+          
           # 보안 검사: .github/workflows 디렉토리 변경 시 중단
-          WORKFLOW_CHANGES=$(git diff --name-only main..HEAD | grep "^\.github/workflows/" || echo "")
+          WORKFLOW_CHANGES=$(cat pr_changed_files.txt | grep "^\.github/workflows/" || echo "")
           if [ -n "$WORKFLOW_CHANGES" ]; then
             echo "❌ 보안 위험: 워크플로우 파일 변경이 감지됨"
             echo "변경된 워크플로우 파일들: $WORKFLOW_CHANGES"
@@ -48,7 +58,7 @@ jobs:
           fi
 
           # 기타 민감한 파일들 체크
-          SENSITIVE_CHANGES=$(git diff --name-only main..HEAD | grep -E "^\.github/(scripts/|CODEOWNERS|.*\.yml$|.*\.yaml$)" | grep -v "^\.github/workflows/" || echo "")
+          SENSITIVE_CHANGES=$(cat pr_changed_files.txt | grep -E "^\.github/(scripts/|CODEOWNERS|.*\.yml$|.*\.yaml$)" | grep -v "^\.github/workflows/" || echo "")
           if [ -n "$SENSITIVE_CHANGES" ]; then
             echo "❌ 보안 위험: 민감한 파일 변경이 감지됨"
             echo "변경된 파일들: $SENSITIVE_CHANGES"
@@ -94,13 +104,20 @@ jobs:
       - name: Get changed files
         id: files
         run: |
-          # PR에서 변경된 파일들 가져오기
-          git diff --name-only main..HEAD > changed_files.txt
-          echo "변경된 파일들:"
-          cat changed_files.txt
+          # PR에서 변경된 파일들을 이미 가져왔으므로 재사용
+          if [ -f pr_changed_files.txt ]; then
+            echo "변경된 파일들:"
+            cat pr_changed_files.txt
+            CHANGED_FILES=$(cat pr_changed_files.txt | tr '\n' ' ')
+          else
+            # API 호출이 실패한 경우 fallback
+            echo "API에서 파일 목록을 가져오지 못했습니다. Git으로 대체합니다."
+            git diff --name-only main..HEAD > changed_files.txt
+            echo "변경된 파일들:"
+            cat changed_files.txt
+            CHANGED_FILES=$(cat changed_files.txt | tr '\n' ' ')
+          fi
 
-          # 변경된 파일들을 환경 변수로 저장
-          CHANGED_FILES=$(cat changed_files.txt | tr '\n' ' ')
           echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
 
       - name: Validate changes
