@@ -1,22 +1,20 @@
 #include <iostream>
-#include <string>
-using namespace std;
 
-int main() {
-	cin.tie(NULL);
-	ios_base::sync_with_stdio(false);
+int main()
+{
+    int coins[101] = { 0, };
+    int n, k;
+    int dp[100000 + 1] = { 0, };
+    std::cin >> n >> k;
+    for (int index = 1; index <= n; index++) {
+        std::cin >> coins[index];
+    }
 
-	int a, b, c;
-	cin >> a >> b >> c;
-
-	cout << a+b-c << "\n";
-
-	string strA = to_string(a);
-	string strB = to_string(b);
-	string strAB = strA + strB;
-	int res = stoi(strAB) - c;
-
-	cout << res;
-
-	return 0;
+    dp[0] = 1;
+    for (int coinIndex = 1; coinIndex <= n; coinIndex++) {
+        for (int dpIndex = coins[coinIndex]; dpIndex <= k; dpIndex++) {
+            dp[dpIndex] += dp[dpIndex - coins[coinIndex]];
+        }
+    }
+    std::cout << dp[k] << std::endl;
 }
