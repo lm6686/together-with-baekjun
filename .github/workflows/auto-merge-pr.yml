@@ -20,15 +20,43 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Get PR author
+      - name: Get PR author and map to folder
         id: pr-info
         run: |
-          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
-          echo "pr_author=$PR_AUTHOR" >> $GITHUB_OUTPUT
-          echo "PR 작성자: $PR_AUTHOR"
+          GITHUB_ID="${{ github.event.pull_request.user.login }}"
+          echo "GitHub ID: $GITHUB_ID"
+
+          # 매핑 파일에서 폴더명 찾기
+          FOLDER_NAME=""
+          if [ -f ".github/user-mapping.yml" ]; then
+            echo "📁 매핑 파일 존재 확인됨"
+            
+            # YAML 파일에서 정확한 매핑 찾기 (개선된 파싱)
+            MAPPING_LINE=$(grep "^$GITHUB_ID:" .github/user-mapping.yml | head -1 || echo "")
+            if [ -n "$MAPPING_LINE" ]; then
+              # "key: "value"" 형식에서 value 추출
+              FOLDER_NAME=$(echo "$MAPPING_LINE" | cut -d'"' -f2)
+              if [ -n "$FOLDER_NAME" ]; then
+                echo "✅ 매핑 발견: $GITHUB_ID -> $FOLDER_NAME"
+              else
+                echo "⚠️ 매핑 파싱 실패: $MAPPING_LINE"
+                FOLDER_NAME=""
+              fi
+            else
+              echo "❌ 매핑을 찾을 수 없음: $GITHUB_ID"
+              echo "📋 사용 가능한 매핑들:"
+              grep "^[^#].*:" .github/user-mapping.yml | head -5
+            fi
+          else
+            echo "❌ 매핑 파일이 없음: .github/user-mapping.yml"
+          fi
+
+          echo "github_id=$GITHUB_ID" >> $GITHUB_OUTPUT
+          echo "folder_name=$FOLDER_NAME" >> $GITHUB_OUTPUT
+          echo "PR 작성자: $GITHUB_ID (폴더: $FOLDER_NAME)"
 
       - name: Get changed files
-        id: changed-files
+        id: files
         run: |
           # PR에서 변경된 파일들 가져오기
           git diff --name-only origin/main..HEAD > changed_files.txt
@@ -42,69 +70,81 @@ jobs:
       - name: Validate changes
         id: validate
         run: |
-          PR_AUTHOR="${{ steps.pr-info.outputs.pr_author }}"
-          CHANGED_FILES="${{ steps.changed-files.outputs.changed_files }}"
+          GITHUB_ID="${{ steps.pr-info.outputs.github_id }}"
+          FOLDER_NAME="${{ steps.pr-info.outputs.folder_name }}"
+          CHANGED_FILES="${{ steps.files.outputs.changed_files }}"
 
           echo "🔍 PR 검증 시작..."
-          echo "PR 작성자: $PR_AUTHOR"
+          echo "GitHub ID: $GITHUB_ID"
+          echo "허용된 폴더명: $FOLDER_NAME"
           echo "변경된 파일들: $CHANGED_FILES"
 
           # 검증 규칙
           VALID=true
           REASON=""
 
+          # 0. 매핑된 폴더명이 있는지 확인
+          if [ -z "$FOLDER_NAME" ]; then
+            VALID=false
+            REASON="GitHub ID ($GITHUB_ID)에 대한 폴더 매핑을 찾을 수 없습니다. 관리자에게 문의하세요."
+          fi
+
           # 1. 변경된 파일이 있는지 확인
-          if [ -z "$CHANGED_FILES" ]; then
+          if [ -z "$CHANGED_FILES" ] && [ "$VALID" = "true" ]; then
             VALID=false
             REASON="변경된 파일이 없습니다."
           fi
 
           # 2. 각 변경된 파일이 해당 사용자 폴더 내에 있는지 확인
-          for file in $CHANGED_FILES; do
-            echo "검사 중인 파일: $file"
-            
-            # 루트 파일들은 허용하지 않음 (README.md, .github 등)
-            if [[ "$file" == *.md ]] && [[ "$file" != */* ]]; then
-              VALID=false
-              REASON="루트 디렉토리의 파일 ($file) 수정은 허용되지 않습니다."
-              break
-            fi
-            
-            if [[ "$file" == .github/* ]]; then
-              VALID=false
-              REASON=".github 디렉토리 수정은 허용되지 않습니다."
-              break
-            fi
-            
-            # 사용자 폴더 내 파일인지 확인
-            if [[ "$file" == */* ]]; then
-              FOLDER_NAME=$(echo "$file" | cut -d'/' -f1)
+          if [ "$VALID" = "true" ]; then
+            for file in $CHANGED_FILES; do
+              echo "검사 중인 파일: $file"
               
-              # 폴더명이 PR 작성자와 일치하는지 확인
-              if [ "$FOLDER_NAME" != "$PR_AUTHOR" ]; then
+              # 루트 파일들은 허용하지 않음 (README.md, .github 등)
+              if [[ "$file" == *.md ]] && [[ "$file" != */* ]]; then
                 VALID=false
-                REASON="다른 사용자의 폴더 ($FOLDER_NAME) 수정은 허용되지 않습니다. 본인의 폴더 ($PR_AUTHOR)만 수정 가능합니다."
+                REASON="루트 디렉토리의 파일 ($file) 수정은 허용되지 않습니다."
                 break
               fi
               
-              # 허용되는 파일 형식인지 확인 (선택적)
-              if [[ "$file" == *README.md ]] || [[ "$file" == *.py ]] || [[ "$file" == *.cpp ]] || [[ "$file" == *.java ]] || [[ "$file" == *.js ]] || [[ "$file" == *.c ]]; then
-                echo "✅ 허용되는 파일: $file"
-              else
-                echo "⚠️ 알 수 없는 파일 형식이지만 허용: $file"
+              if [[ "$file" == .github/* ]]; then
+                VALID=false
+                REASON=".github 디렉토리 수정은 허용되지 않습니다."
+                break
               fi
-            else
-              VALID=false
-              REASON="폴더 구조를 따르지 않는 파일입니다: $file"
-              break
-            fi
-          done
+              
+              # 사용자 폴더 내 파일인지 확인
+              if [[ "$file" == */* ]]; then
+                FILE_FOLDER=$(echo "$file" | cut -d'/' -f1)
+                
+                # 폴더명이 매핑된 폴더와 일치하는지 확인
+                if [ "$FILE_FOLDER" != "$FOLDER_NAME" ]; then
+                  VALID=false
+                  REASON="다른 사용자의 폴더 ($FILE_FOLDER) 수정은 허용되지 않습니다. 본인의 폴더 ($FOLDER_NAME)만 수정 가능합니다."
+                  break
+                fi
+                
+                # 허용되는 파일 형식인지 확인 (선택적)
+                if [[ "$file" == *README.md ]] || [[ "$file" == *.py ]] || [[ "$file" == *.cpp ]] || [[ "$file" == *.java ]] || [[ "$file" == *.js ]] || [[ "$file" == *.c ]]; then
+                  echo "✅ 허용되는 파일: $file"
+                else
+                  echo "⚠️ 알 수 없는 파일 형식이지만 허용: $file"
+                fi
+              else
+                VALID=false
+                REASON="폴더 구조를 따르지 않는 파일입니다: $file"
+                break
+              fi
+            done
+          fi
 
           # 3. 최소 하나의 문제 폴더가 있는지 확인
-          PROBLEM_FOLDERS=$(echo "$CHANGED_FILES" | tr ' ' '\n' | grep "^$PR_AUTHOR/[0-9]" | head -1)
-          if [ -z "$PROBLEM_FOLDERS" ] && [ "$VALID" = "true" ]; then
-            VALID=false
-            REASON="문제 번호 폴더가 포함되지 않았습니다. (예: $PR_AUTHOR/1000/)"
+          if [ "$VALID" = "true" ]; then
+            PROBLEM_FOLDERS=$(echo "$CHANGED_FILES" | tr ' ' '\n' | grep "^$FOLDER_NAME/[0-9]" | head -1)
+            if [ -z "$PROBLEM_FOLDERS" ]; then
+              VALID=false
+              REASON="문제 번호 폴더가 포함되지 않았습니다. (예: $FOLDER_NAME/1000/)"
+            fi
           fi
 
           echo "valid=$VALID" >> $GITHUB_OUTPUT
@@ -122,17 +162,22 @@ jobs:
         with:
           script: |
             const reason = '${{ steps.validate.outputs.reason }}';
-            const prAuthor = '${{ steps.pr-info.outputs.pr_author }}';
+            const githubId = '${{ steps.pr-info.outputs.github_id }}';
+            const folderName = '${{ steps.pr-info.outputs.folder_name }}';
 
             const comment = `❌ **PR 자동 검증 실패**
 
             **실패 사유:** ${reason}
 
             **규칙:**
-            1. 본인의 폴더(\`${prAuthor}/\`)에 있는 파일만 수정 가능합니다
-            2. 문제 번호 폴더(예: \`${prAuthor}/1000/\`)가 포함되어야 합니다
+            1. 본인의 폴더(\`${folderName || githubId}/\`)에 있는 파일만 수정 가능합니다
+            2. 문제 번호 폴더(예: \`${folderName || githubId}/1000/\`)가 포함되어야 합니다
             3. 루트 파일이나 다른 사용자 폴더 수정은 불가합니다
             4. \`.github\` 폴더 수정은 불가합니다
+
+            **GitHub ID와 폴더 매핑:**
+            - GitHub ID: ${githubId}
+            - 허용된 폴더: ${folderName || '매핑되지 않음'}
 
             **수정 후 다시 푸시해주세요!** 🔄`;
 
@@ -148,13 +193,15 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const prAuthor = '${{ steps.pr-info.outputs.pr_author }}';
-            const changedFiles = '${{ steps.changed-files.outputs.changed_files }}';
+            const githubId = '${{ steps.pr-info.outputs.github_id }}';
+            const folderName = '${{ steps.pr-info.outputs.folder_name }}';
+            const changedFiles = '${{ steps.files.outputs.changed_files }}';
 
             const comment = `✅ **PR 자동 검증 통과!**
 
             **검증된 내용:**
-            - 작성자: ${prAuthor}
+            - GitHub ID: ${githubId}
+            - 허용된 폴더: ${folderName}
             - 수정된 파일들: ${changedFiles}
 
             모든 규칙을 만족하여 자동으로 머지됩니다. 🎉`;
@@ -190,7 +237,7 @@ jobs:
                 repo: context.repo.repo,
                 pull_number: context.issue.number,
                 commit_title: `Auto-merge: ${context.payload.pull_request.title}`,
-                commit_message: `자동 머지됨 - ${{ steps.pr-info.outputs.pr_author }}의 문제 풀이`,
+                commit_message: `자동 머지됨 - ${{ steps.pr-info.outputs.github_id }}(${{ steps.pr-info.outputs.folder_name }})의 문제 풀이`,
                 merge_method: 'squash'
               });
               console.log('✅ PR이 성공적으로 머지되었습니다!');
