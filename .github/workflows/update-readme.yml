@@ -4,16 +4,13 @@ on:
   push:
     branches: [main]
     paths:
-      - "*/*/solution.*" # 사용자 폴더의 문제 풀이 파일
-      - "*/*/README.md" # 사용자 폴더의 문제 README
       - "*/*/**" # 사용자 폴더 내 모든 파일
   workflow_dispatch: # 수동 실행 가능
 
 jobs:
   update-readme:
     runs-on: ubuntu-latest
-    # Auto-merge에 의한 커밋은 제외
-    if: ${{ !contains(github.event.head_commit.message, 'Auto-merge') && !contains(github.event.head_commit.message, 'Auto-update README') }}
+    if: ${{ !contains(github.event.head_commit.message, 'Auto-update README') }}
     permissions:
       contents: write
       pull-requests: write
