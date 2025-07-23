@@ -21,7 +21,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
       - name: Get PR author and map to folder
@@ -164,6 +164,7 @@ jobs:
         if: steps.validate.outputs.valid == 'false'
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const reason = '${{ steps.validate.outputs.reason }}';
             const githubId = '${{ steps.pr-info.outputs.github_id }}';
@@ -196,6 +197,7 @@ jobs:
         if: steps.validate.outputs.valid == 'true'
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const githubId = '${{ steps.pr-info.outputs.github_id }}';
             const folderName = '${{ steps.pr-info.outputs.folder_name }}';
@@ -221,6 +223,7 @@ jobs:
         if: steps.validate.outputs.valid == 'true'
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             github.rest.pulls.createReview({
               owner: context.repo.owner,
@@ -234,6 +237,7 @@ jobs:
         if: steps.validate.outputs.valid == 'true'
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             try {
               await github.rest.pulls.merge({
