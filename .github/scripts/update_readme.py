@@ -40,10 +40,6 @@ def get_korea_today():
     print(f"📅 한국 오늘: {today}")
     return today
 
-def get_korea_today():
-    """한국 시간 기준 오늘 날짜 반환"""
-    return get_korea_now().date()
-
 def convert_to_korea_time(dt):
     """datetime을 한국 시간으로 변환"""
     if KST:

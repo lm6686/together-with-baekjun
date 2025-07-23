@@ -26,6 +26,40 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
+      - name: Install jq for JSON parsing
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Get changed files via GitHub API
+        id: files
+        run: |
+          echo "PR 번호: ${{ github.event.number }}"
+          echo "Base SHA: ${{ github.event.pull_request.base.sha }}"
+          echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
+
+          # GitHub API를 통해 PR의 변경된 파일 목록 가져오기 (내부/외부 PR 일관성 확보)
+          HTTP_STATUS=$(curl -s -w "%{http_code}" -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               -H "Accept: application/vnd.github.v3+json" \
+               "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.number }}/files" \
+               -o api_response.json)
+
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            jq -r '.[].filename' api_response.json > changed_files.txt
+            echo "✅ API로 파일 목록 가져오기 성공"
+          else
+            echo "❌ GitHub API 호출 실패 (HTTP: $HTTP_STATUS), Git 방식으로 fallback"
+            # API 실패 시 Git 방식으로 fallback
+            git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} > changed_files.txt
+          fi
+
+          echo "변경된 파일들:"
+          cat changed_files.txt
+
+          # 변경된 파일들을 환경 변수로 저장
+          CHANGED_FILES=$(cat changed_files.txt | tr '\n' ' ')
+          echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+
       - name: Get PR author and map to folder
         id: pr-info
         run: |
@@ -60,18 +94,6 @@ jobs:
           echo "github_id=$GITHUB_ID" >> $GITHUB_OUTPUT
           echo "folder_name=$FOLDER_NAME" >> $GITHUB_OUTPUT
           echo "PR 작성자: $GITHUB_ID (폴더: $FOLDER_NAME)"
-
-      - name: Get changed files
-        id: files
-        run: |
-          # PR에서 변경된 파일들 가져오기
-          git diff --name-only origin/main..HEAD > changed_files.txt
-          echo "변경된 파일들:"
-          cat changed_files.txt
-
-          # 변경된 파일들을 환경 변수로 저장
-          CHANGED_FILES=$(cat changed_files.txt | tr '\n' ' ')
-          echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
 
       - name: Validate changes
         id: validate
