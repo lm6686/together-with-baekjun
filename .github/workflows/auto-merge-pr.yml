@@ -12,6 +12,10 @@ jobs:
       contents: write
       pull-requests: write
       checks: read
+      actions: read
+      issues: write
+      repository-projects: read
+      statuses: read
 
     steps:
       - name: Checkout code
