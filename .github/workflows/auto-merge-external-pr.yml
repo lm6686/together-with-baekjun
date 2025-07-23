@@ -1,15 +1,15 @@
-name: Auto Merge PR
+name: Auto Merge External PR
 
 on:
-  pull_request:
+  pull_request_target: # 외부 포크 PR도 메인 레포 권한으로 실행
     types: [opened, synchronize, reopened]
     branches: [main]
 
 jobs:
-  validate-and-merge:
+  validate-and-merge-external:
     runs-on: ubuntu-latest
-    # 포크된 PR은 제외 (보안상 이유)
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    # 외부 포크에서 온 PR만 처리
+    if: github.event.pull_request.head.repo.full_name != github.repository
     permissions:
       contents: write
       pull-requests: write
@@ -20,11 +20,41 @@ jobs:
       statuses: read
 
     steps:
-      - name: Checkout code
+      - name: Checkout base repository (안전한 체크아웃)
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+          # 주의: 외부 PR의 코드가 아닌 메인 레포의 코드를 체크아웃
+
+      - name: Checkout PR changes (제한적 체크아웃)
+        run: |
+          # PR의 변경사항만 안전하게 가져오기
+          git fetch origin pull/${{ github.event.number }}/head:pr-${{ github.event.number }}
+          git checkout pr-${{ github.event.number }}
+
+          # base branch와 비교할 수 있도록 origin/main도 fetch
+          git fetch origin main:main
+
+      - name: Security check - 워크플로우 파일 변경 확인
+        run: |
+          # 보안 검사: .github/workflows 디렉토리 변경 시 중단
+          WORKFLOW_CHANGES=$(git diff --name-only main..HEAD | grep "^\.github/workflows/" || echo "")
+          if [ -n "$WORKFLOW_CHANGES" ]; then
+            echo "❌ 보안 위험: 워크플로우 파일 변경이 감지됨"
+            echo "변경된 워크플로우 파일들: $WORKFLOW_CHANGES"
+            echo "외부 PR에서 워크플로우 변경은 허용되지 않습니다."
+            exit 1
+          fi
+
+          # 기타 민감한 파일들 체크
+          SENSITIVE_CHANGES=$(git diff --name-only main..HEAD | grep -E "^\.github/(scripts/|CODEOWNERS|.*\.yml$|.*\.yaml$)" | grep -v "^\.github/workflows/" || echo "")
+          if [ -n "$SENSITIVE_CHANGES" ]; then
+            echo "❌ 보안 위험: 민감한 파일 변경이 감지됨"
+            echo "변경된 파일들: $SENSITIVE_CHANGES"
+            echo "외부 PR에서 .github 디렉토리 파일 변경은 허용되지 않습니다."
+            exit 1
+          fi
 
       - name: Get PR author and map to folder
         id: pr-info
@@ -65,7 +95,7 @@ jobs:
         id: files
         run: |
           # PR에서 변경된 파일들 가져오기
-          git diff --name-only origin/main..HEAD > changed_files.txt
+          git diff --name-only main..HEAD > changed_files.txt
           echo "변경된 파일들:"
           cat changed_files.txt
 
@@ -80,12 +110,12 @@ jobs:
           FOLDER_NAME="${{ steps.pr-info.outputs.folder_name }}"
           CHANGED_FILES="${{ steps.files.outputs.changed_files }}"
 
-          echo "🔍 PR 검증 시작..."
+          echo "🔍 외부 PR 검증 시작..."
           echo "GitHub ID: $GITHUB_ID"
           echo "허용된 폴더명: $FOLDER_NAME"
           echo "변경된 파일들: $CHANGED_FILES"
 
-          # 검증 규칙
+          # 검증 규칙 (더 엄격하게)
           VALID=true
           REASON=""
 
@@ -101,21 +131,29 @@ jobs:
             REASON="변경된 파일이 없습니다."
           fi
 
-          # 2. 각 변경된 파일이 해당 사용자 폴더 내에 있는지 확인
+          # 2. 각 변경된 파일이 해당 사용자 폴더 내에 있는지 확인 (더 엄격)
           if [ "$VALID" = "true" ]; then
             for file in $CHANGED_FILES; do
               echo "검사 중인 파일: $file"
               
-              # 루트 파일들은 허용하지 않음 (README.md, .github 등)
+              # 루트 파일들은 절대 허용하지 않음
               if [[ "$file" == *.md ]] && [[ "$file" != */* ]]; then
                 VALID=false
-                REASON="루트 디렉토리의 파일 ($file) 수정은 허용되지 않습니다."
+                REASON="루트 디렉토리의 파일 ($file) 수정은 외부 PR에서 허용되지 않습니다."
                 break
               fi
               
+              # .github 디렉토리는 절대 허용하지 않음
               if [[ "$file" == .github/* ]]; then
                 VALID=false
-                REASON=".github 디렉토리 수정은 허용되지 않습니다."
+                REASON=".github 디렉토리 수정은 외부 PR에서 허용되지 않습니다."
+                break
+              fi
+              
+              # 다른 설정 파일들도 차단
+              if [[ "$file" == .gitignore ]] || [[ "$file" == LICENSE ]] || [[ "$file" == .* ]]; then
+                VALID=false
+                REASON="설정 파일 ($file) 수정은 외부 PR에서 허용되지 않습니다."
                 break
               fi
               
@@ -130,12 +168,12 @@ jobs:
                   break
                 fi
                 
-                # 허용되는 파일 형식인지 확인 (엄격)
+                # 허용되는 파일 형식인지 확인 (더 엄격)
                 if [[ "$file" == *README.md ]] || [[ "$file" == *.py ]] || [[ "$file" == *.cpp ]] || [[ "$file" == *.java ]] || [[ "$file" == *.js ]] || [[ "$file" == *.c ]] || [[ "$file" == *.rs ]] || [[ "$file" == *.py3 ]]; then
                   echo "✅ 허용되는 파일: $file"
                 else
                   VALID=false
-                  REASON="허용되지 않는 파일 형식입니다: $file (허용: .py, .cpp, .java, .js, .c, .rs, .py3, README.md)"
+                  REASON="허용되지 않는 파일 형식입니다: $file"
                   break
                 fi
               else
@@ -159,9 +197,9 @@ jobs:
           echo "reason=$REASON" >> $GITHUB_OUTPUT
 
           if [ "$VALID" = "true" ]; then
-            echo "✅ PR 검증 통과!"
+            echo "✅ 외부 PR 검증 통과!"
           else
-            echo "❌ PR 검증 실패: $REASON"
+            echo "❌ 외부 PR 검증 실패: $REASON"
           fi
 
       - name: Comment on PR if validation fails
@@ -174,15 +212,15 @@ jobs:
             const githubId = '${{ steps.pr-info.outputs.github_id }}';
             const folderName = '${{ steps.pr-info.outputs.folder_name }}';
 
-            const comment = `❌ **PR 자동 검증 실패**
+            const comment = `❌ **외부 PR 자동 검증 실패**
 
             **실패 사유:** ${reason}
 
-            **규칙:**
-            1. 본인의 폴더(\`${folderName || githubId}/\`)에 있는 파일만 수정 가능합니다
+            **외부 PR 규칙 (더 엄격):**
+            1. 본인의 폴더(\`${folderName || githubId}/\`)에 있는 코드 파일만 수정 가능합니다
             2. 문제 번호 폴더(예: \`${folderName || githubId}/1000/\`)가 포함되어야 합니다
-            3. 루트 파일이나 다른 사용자 폴더 수정은 불가합니다
-            4. \`.github\` 폴더 수정은 불가합니다
+            3. 루트 파일, 설정 파일, .github 폴더 수정은 절대 불가합니다
+            4. 허용되는 파일 형식: .py, .cpp, .java, .js, .c, .rs, .py3, README.md
 
             **GitHub ID와 폴더 매핑:**
             - GitHub ID: ${githubId}
@@ -207,14 +245,16 @@ jobs:
             const folderName = '${{ steps.pr-info.outputs.folder_name }}';
             const changedFiles = '${{ steps.files.outputs.changed_files }}';
 
-            const comment = `✅ **PR 자동 검증 통과!**
+            const comment = `✅ **외부 PR 자동 검증 통과!**
 
             **검증된 내용:**
             - GitHub ID: ${githubId}
             - 허용된 폴더: ${folderName}
             - 수정된 파일들: ${changedFiles}
 
-            모든 규칙을 만족하여 자동으로 머지됩니다. 🎉`;
+            모든 보안 규칙을 만족하여 자동으로 머지됩니다. 🎉
+
+            ⚠️ **보안 알림**: 이는 외부 기여자의 PR이므로 추가 보안 검증을 거쳤습니다.`;
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -234,7 +274,7 @@ jobs:
               repo: context.repo.repo,
               pull_number: context.issue.number,
               event: 'APPROVE',
-              body: '🤖 자동 승인: 모든 검증 규칙을 만족합니다!'
+              body: '🤖 자동 승인: 모든 보안 검증 규칙을 만족합니다! (외부 PR 검증 완료)'
             });
 
       - name: Auto merge PR
@@ -248,13 +288,13 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: context.issue.number,
-                commit_title: `Auto-merge: ${context.payload.pull_request.title}`,
-                commit_message: `자동 머지됨 - ${{ steps.pr-info.outputs.github_id }}(${{ steps.pr-info.outputs.folder_name }})의 문제 풀이`,
+                commit_title: `Auto-merge (External): ${context.payload.pull_request.title}`,
+                commit_message: `외부 PR 자동 머지됨 - ${{ steps.pr-info.outputs.github_id }}(${{ steps.pr-info.outputs.folder_name }})의 문제 풀이`,
                 merge_method: 'squash'
               });
-              console.log('✅ PR이 성공적으로 머지되었습니다!');
+              console.log('✅ 외부 PR이 성공적으로 머지되었습니다!');
             } catch (error) {
-              console.log('❌ 머지 실패:', error.message);
+              console.log('❌ 외부 PR 머지 실패:', error.message);
               console.log('에러 상세:', error);
               
               // 머지 실패 시 코멘트 추가
@@ -262,7 +302,7 @@ jobs:
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                body: `❌ **자동 머지 실패**\n\n**오류:** ${error.message}\n\n**가능한 원인:**\n- 충돌(conflict)이 발생했을 수 있습니다\n- 브랜치 보호 규칙에 의해 차단되었을 수 있습니다\n- 필수 체크가 완료되지 않았을 수 있습니다\n\n**해결방법:** 수동으로 머지하거나 충돌을 해결해주세요.`
+                body: `❌ **외부 PR 자동 머지 실패**\n\n**오류:** ${error.message}\n\n**가능한 원인:**\n- 충돌(conflict)이 발생했을 수 있습니다\n- 브랜치 보호 규칙에 의해 차단되었을 수 있습니다\n- 필수 체크가 완료되지 않았을 수 있습니다\n\n**해결방법:** 관리자가 수동으로 머지하거나 충돌을 해결해주세요.`
               });
               throw error;
             }
