@@ -1,4 +1,4 @@
-name: Auto Merge External PR
+name: Validate External PR
 
 on:
   pull_request_target: # 외부 포크 PR도 메인 레포 권한으로 실행
@@ -6,18 +6,14 @@ on:
     branches: [main]
 
 jobs:
-  validate-and-merge-external:
+  validate-external:
     runs-on: ubuntu-latest
     # 외부 포크에서 온 PR만 처리
     if: github.event.pull_request.head.repo.full_name != github.repository
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
-      checks: read
-      actions: read
       issues: write
-      repository-projects: read
-      statuses: read
 
     steps:
       - name: Checkout base repository (안전한 체크아웃)
@@ -278,7 +274,9 @@ jobs:
             - 허용된 폴더: ${folderName}
             - 수정된 파일들: ${changedFiles}
 
-            모든 보안 규칙을 만족하여 자동으로 머지됩니다. 🎉
+            모든 보안 규칙을 만족합니다! 🎉
+
+            **다음 단계:** 관리자(@iubns)가 검토 후 수동으로 머지합니다.
 
             ⚠️ **보안 알림**: 이는 외부 기여자의 PR이므로 추가 보안 검증을 거쳤습니다.`;
 
@@ -303,32 +301,30 @@ jobs:
               body: '🤖 자동 승인: 모든 보안 검증 규칙을 만족합니다! (외부 PR 검증 완료)'
             });
 
-      - name: Auto merge PR
+      - name: Add manual merge request comment
         if: steps.validate.outputs.valid == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            try {
-              await github.rest.pulls.merge({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.issue.number,
-                commit_title: `Auto-merge (External): ${context.payload.pull_request.title}`,
-                commit_message: `외부 PR 자동 머지됨 - ${{ steps.pr-info.outputs.github_id }}(${{ steps.pr-info.outputs.folder_name }})의 문제 풀이`,
-                merge_method: 'squash'
-              });
-              console.log('✅ 외부 PR이 성공적으로 머지되었습니다!');
-            } catch (error) {
-              console.log('❌ 외부 PR 머지 실패:', error.message);
-              console.log('에러 상세:', error);
+            console.log('✅ 외부 PR 검증 완료 - 수동 머지 대기 중');
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🎯 **외부 PR 검증 완료 - 수동 머지 요청**
+
+              **검증 완료된 PR:**
+              - 작성자: ${{ steps.pr-info.outputs.github_id }}
+              - 폴더: ${{ steps.pr-info.outputs.folder_name }}
+              - 모든 보안 규칙 통과 ✅
+
+              **관리자 안내:** 이 PR은 모든 자동 검증을 통과했습니다. 
+              추가 검토 후 수동으로 머지해 주세요.
               
-              // 머지 실패 시 코멘트 추가
-              await github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: `❌ **외부 PR 자동 머지 실패**\n\n**오류:** ${error.message}\n\n**가능한 원인:**\n- 충돌(conflict)이 발생했을 수 있습니다\n- 브랜치 보호 규칙에 의해 차단되었을 수 있습니다\n- 필수 체크가 완료되지 않았을 수 있습니다\n\n**해결방법:** 관리자가 수동으로 머지하거나 충돌을 해결해주세요.`
-              });
-              throw error;
-            }
+              **머지 명령어:**
+              \`\`\`
+              외부 PR 검증 완료 - ${{ steps.pr-info.outputs.github_id }}(${{ steps.pr-info.outputs.folder_name }})의 문제 풀이
+              \`\`\``
+            });
