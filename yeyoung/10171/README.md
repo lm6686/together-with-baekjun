@@ -1,7 +1,7 @@
 ## 📍 문제 정보
 
 - [#10171. 고양이 ](https://www.acmicpc.net/problem/10171)
-  <img src="https://static.solved.ac/tier_small/s1.svg" width="16" height="16">
+  <img src="https://static.solved.ac/tier_small/1.svg" width="16" height="16">
 
 - **🏷️ 문제 유형**: 구현
 
@@ -21,7 +21,7 @@
 
 ## 예제 입력
 
-> 
+>
 
 ## 예제 출력
 
@@ -44,4 +44,4 @@
 
 ## 💭 풀이 과정 (ETC)
 
-> 
+>

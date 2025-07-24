@@ -1,7 +1,7 @@
 ## 📍 문제 정보
 
 - [#10869. 사칙연산 ](https://www.acmicpc.net/problem/10869)
-  <img src="https://static.solved.ac/tier_small/s1.svg" width="16" height="16">
+  <img src="https://static.solved.ac/tier_small/1.svg" width="16" height="16">
 
 - **🏷️ 문제 유형**: 수학, 구현, 사칙연산
 
@@ -9,7 +9,7 @@
 
 ## 문제
 
-> 두 자연수 A와 B가 주어진다. 이때, A+B, A-B, A*B, A/B(몫), A%B(나머지)를 출력하는 프로그램을 작성하시오. 
+> 두 자연수 A와 B가 주어진다. 이때, A+B, A-B, A\*B, A/B(몫), A%B(나머지)를 출력하는 프로그램을 작성하시오.
 
 ## 입력
 
@@ -17,7 +17,7 @@
 
 ## 출력
 
-> 첫째 줄에 A+B, 둘째 줄에 A-B, 셋째 줄에 A*B, 넷째 줄에 A/B, 다섯째 줄에 A%B를 출력한다.
+> 첫째 줄에 A+B, 둘째 줄에 A-B, 셋째 줄에 A\*B, 넷째 줄에 A/B, 다섯째 줄에 A%B를 출력한다.
 
 ## 예제 입력
 
@@ -30,6 +30,7 @@
 > 21
 > 2
 > 1
+
 ---
 
 ## 📊 풀이 정보

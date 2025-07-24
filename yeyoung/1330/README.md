@@ -1,7 +1,7 @@
 ## 📍 문제 정보
 
 - [#1330. 두 수 비교하기 ](https://www.acmicpc.net/problem/1330)
-  <img src="https://static.solved.ac/tier_small/s1.svg" width="16" height="16">
+  <img src="https://static.solved.ac/tier_small/1.svg" width="16" height="16">
 
 - **🏷️ 문제 유형**: 구현
 
@@ -19,9 +19,10 @@
 
 > 첫째 줄에 다음 세 가지 중 하나를 출력한다.
 > \
-> * A가 B보다 큰 경우에는 '>'를 출력한다.
-> * A가 B보다 작은 경우에는 '<'를 출력한다.
-> * A와 B가 같은 경우에는 '=='를 출력한다.
+>
+> - A가 B보다 큰 경우에는 '>'를 출력한다.
+> - A가 B보다 작은 경우에는 '<'를 출력한다.
+> - A와 B가 같은 경우에는 '=='를 출력한다.
 
 ## 예제 입력
 
@@ -47,4 +48,4 @@
 
 ## 💭 풀이 과정 (ETC)
 
-> 
+>

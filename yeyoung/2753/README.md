@@ -1,7 +1,7 @@
 ## 📍 문제 정보
 
 - [#2753. 윤년 ](https://www.acmicpc.net/problem/2753)
-  <img src="https://static.solved.ac/tier_small/s1.svg" width="16" height="16">
+  <img src="https://static.solved.ac/tier_small/1.svg" width="16" height="16">
 
 - **🏷️ 문제 유형**: 구현
 
@@ -41,4 +41,4 @@
 
 ## 💭 풀이 과정 (ETC)
 
-> 
+>

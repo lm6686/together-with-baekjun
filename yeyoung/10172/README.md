@@ -1,7 +1,7 @@
 ## 📍 문제 정보
 
 - [#10172. 개 ](https://www.acmicpc.net/problem/10172)
-  <img src="https://static.solved.ac/tier_small/s1.svg" width="16" height="16">
+  <img src="https://static.solved.ac/tier_small/1.svg" width="16" height="16">
 
 - **🏷️ 문제 유형**: 수학, 사칙연산
 
@@ -21,7 +21,7 @@
 
 ## 예제 입력
 
-> 
+>
 
 ## 예제 출력
 
@@ -45,4 +45,4 @@
 
 ## 💭 풀이 과정 (ETC)
 
-> 
+>

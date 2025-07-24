@@ -1,7 +1,7 @@
 ## 📍 문제 정보
 
 - [#11382. 꼬마 정민 ](https://www.acmicpc.net/problem/11382)
-  <img src="https://static.solved.ac/tier_small/s1.svg" width="16" height="16">
+  <img src="https://static.solved.ac/tier_small/1.svg" width="16" height="16">
 
 - **🏷️ 문제 유형**: 수학, 구현, 사칙연산
 
@@ -39,4 +39,4 @@
 
 ## 💭 풀이 과정 (ETC)
 
-> 
+>
