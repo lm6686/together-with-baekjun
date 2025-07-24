@@ -60,10 +60,9 @@ N바이트까지 저장 가능한 자료형이라면 "long"을 N/4번 적고 마
 ## 🔥 풀이 핵심:  
 - for문 학습: int i = 0; i < N; i++ 형식으로 반복 실행 구조 익힘
 - 문제 설명에서 C++의 int, long, long long 자료형 크기와 Java의 int, long의 차이를 비교할 수 있어서 두 언어의 자료형 차이점도 자연스럽게 공부하게 되었다.
-| 개념       | C++                   | Java           |
-|------------|------------------------|----------------|
-| 정수 기본형 | int                    | int            |
-| 더 큰 정수 | long, long long        | long           |
-| 실수형     | float, double          | float, double  |
-| 문자       | char                   | char           |
-| 문자열     | std::string            | String         |
+
+  - 정수 기본형: C++ `int`  = Java `int`
+  - 더 큰 정수: C++ `long`, `long long` = Java `long`
+  - 실수형:     C++ `float`, `double` = Java `float`, `double`
+  - 문자형:     C++ `char` = Java `char`
+  - 문자열:     C++ `std::string` = Java `String`
