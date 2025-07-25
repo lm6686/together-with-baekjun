@@ -408,7 +408,13 @@ def update_main_readme(users_data):
 |------|--------|-------------|----------|----------|--------|-----------|
 """
     
-    for username, data in users_data.items():
+    # 참여자를 시작일 순으로 정렬 (시작일이 없는 경우는 맨 뒤로)
+    sorted_users = sorted(users_data.items(), key=lambda x: (
+        datetime.strptime(x[1]['stats']['first_date'], '%Y-%m-%d') if x[1].get('problems') and x[1].get('stats') and x[1]['stats']['first_date'] else datetime.max,
+        x[0]  # 시작일이 같을 경우 이름순
+    ))
+    
+    for username, data in sorted_users:
         last_activity = data['last_update'] if data['last_update'] else "-"
         
         if data['problems'] and 'stats' in data:

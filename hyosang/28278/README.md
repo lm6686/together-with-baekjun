@@ -1,6 +1,6 @@
 ## 📌 문제 링크
 
-[#28278. 다음 소수](https://www.acmicpc.net/problem/28278) <img src="https://static.solved.ac/tier_small/7.svg" width="16" height="16">
+[#28278. 스택 2](https://www.acmicpc.net/problem/28278) <img src="https://static.solved.ac/tier_small/7.svg" width="16" height="16">
 
 ---
 
