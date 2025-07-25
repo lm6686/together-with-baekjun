@@ -7,6 +7,11 @@ on:
       - "*/*/**" # 사용자 폴더 내 모든 파일
   workflow_dispatch: # 수동 실행 가능
 
+# 동시 실행 방지
+concurrency:
+  group: update-readme-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   update-readme:
     runs-on: ubuntu-latest
@@ -49,11 +54,25 @@ jobs:
         run: |
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
+          
+          # 원격 브랜치와 동기화
+          git fetch origin ${{ github.ref_name }}
+          
           git add .
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Auto-update README files [skip ci]"
+            # 변경사항이 있다면 rebase 후 푸시
+            if ! git diff --quiet HEAD origin/${{ github.ref_name }}; then
+              echo "Remote has changes, rebasing..."
+              git pull --rebase origin ${{ github.ref_name }} || {
+                echo "Rebase failed, trying merge strategy"
+                git rebase --abort
+                git pull origin ${{ github.ref_name }}
+              }
+            fi
+            
+            git commit -m "Auto-update README files [skip ci]" || echo "Nothing to commit"
             git push origin HEAD:${{ github.ref_name }}
           fi
         env:

@@ -2,9 +2,14 @@ name: Auto Complete README
 
 on:
   push:
-    branches: [main]
+    branches: [main, auto_create]  # 현재 브랜치도 추가
   pull_request:
     branches: [main]
+
+# 동시 실행 방지
+concurrency:
+  group: auto-complete-readme-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   auto-complete-readme:
@@ -49,10 +54,24 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          
+          # 원격 브랜치와 동기화
+          git fetch origin ${{ github.ref_name }}
+          
           git add .
           git commit -m "docs: auto-complete README files with problem information" || exit 0
 
       - name: Push changes
         if: steps.git-check.outputs.changes == 'true'
         run: |
+          # 원격에 변경사항이 있는지 확인 후 rebase
+          if ! git diff --quiet HEAD origin/${{ github.ref_name }}; then
+            echo "Remote has changes, rebasing..."
+            git pull --rebase origin ${{ github.ref_name }} || {
+              echo "Rebase failed, trying merge strategy"
+              git rebase --abort
+              git pull origin ${{ github.ref_name }}
+            }
+          fi
+          
           git push origin ${{ github.ref_name }}
