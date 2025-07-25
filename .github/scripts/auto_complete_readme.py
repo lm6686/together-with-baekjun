@@ -83,8 +83,8 @@ def get_problem_info_from_baekjoon(problem_id):
         print(f"❌ 백준 사이트 요청 실패 (문제 {problem_id}): {e}")
     return None
 
-def generate_readme_content(problem_info, baekjoon_info, existing_content=""):
-    """README 내용 생성"""
+def generate_readme_content(problem_info, baekjoon_info=None, existing_content=""):
+    """README 내용 생성 - baekjoon_info가 None일 때도 처리"""
     problem_id = problem_info['id']
     title = problem_info['title']
     level = problem_info['level']
@@ -93,6 +93,7 @@ def generate_readme_content(problem_info, baekjoon_info, existing_content=""):
     # 기존 풀이 정보 추출
     existing_solve_info = ""
     existing_process = ""
+    existing_core = ""
     
     if existing_content:
         solve_match = re.search(r'## 📊 풀이 정보(.*?)(?=##|---|\Z)', existing_content, re.DOTALL)
@@ -105,11 +106,12 @@ def generate_readme_content(problem_info, baekjoon_info, existing_content=""):
         
         # 풀이 핵심도 추가로 추출
         core_match = re.search(r'## 🔥 풀이 핵심(.*?)(?=##|---|\Z)', existing_content, re.DOTALL)
-        existing_core = ""
         if core_match:
             existing_core = core_match.group(1).strip()
-    
-    readme_content = f"""[#{problem_id}. {title}](https://www.acmicpc.net/problem/{problem_id})
+
+    # baekjoon_info가 있는 경우 (성공적으로 스크래핑된 경우)
+    if baekjoon_info:
+        readme_content = f"""[#{problem_id}. {title}](https://www.acmicpc.net/problem/{problem_id})
 <img src="https://static.solved.ac/tier_small/{level}.svg" width="16" height="16">
 
 ---
@@ -159,6 +161,44 @@ def generate_readme_content(problem_info, baekjoon_info, existing_content=""):
 
 {existing_core if existing_core else '> 여기에 풀이 핵심을 작성하세요.'}
 """
+    else:
+        # baekjoon_info가 없는 경우 (스크래핑 실패 시 fallback)
+        readme_content = f"""[#{problem_id}. {title}](https://www.acmicpc.net/problem/{problem_id})
+<img src="https://static.solved.ac/tier_small/{level}.svg" width="16" height="16">
+
+---
+
+## 📍 문제 정보
+
+- **문제 번호**: {problem_id}
+- **🏷️ 문제 유형**: {tags}
+
+---
+
+## 📝 문제 링크
+
+> [백준 #{problem_id}번 문제 바로가기](https://www.acmicpc.net/problem/{problem_id})
+> 
+> ⚠️ 문제 내용은 위 링크에서 직접 확인해주세요.
+
+---
+
+## 📊 풀이 정보
+
+{existing_solve_info if existing_solve_info else '''- **⏱️ 소요 시간**: 
+- **🔄 시도 횟수**: 
+- **📅 풀이 날짜**: '''}
+
+---
+
+## 💭 풀이 과정
+
+{existing_process if existing_process else '> 여기에 풀이 과정을 작성하세요.'}
+
+## 🔥 풀이 핵심
+
+{existing_core if existing_core else '> 여기에 풀이 핵심을 작성하세요.'}
+"""
     
     return readme_content
 
@@ -172,25 +212,20 @@ def find_readme_files_with_problem_numbers():
         for file in files:
             if file == 'README.md':
                 file_path = os.path.join(root, file)
-                print(f"📂 검사 중: {file_path}")
                 try:
                     with open(file_path, 'r', encoding='utf-8') as f:
                         content = f.read()
                         # [#숫자] 패턴 찾기 (단독으로 있는 경우만)
                         lines = content.split('\n')
                         first_few_lines = '\n'.join(lines[:5])  # 처음 5줄만 확인
-                        print(f"   처음 5줄:\n{first_few_lines}")
                         match = re.search(r'^#\s*\[#(\d+)\]$', first_few_lines, re.MULTILINE)
-                        print(f"   정규식 매치 결과: {match}")
                         if match:
                             problem_id = match.group(1)
-                            print(f"🔍 [#문제번호] 패턴 발견: {file_path} (문제 #{problem_id})")
                             # 이미 완성된 README인지 확인 (문제 정보가 있는지)
                             has_problem_info = re.search(r'## 📍 문제 정보', content)
-                            print(f"   📍 문제 정보 섹션 존재: {'Yes' if has_problem_info else 'No'}")
                             if not has_problem_info:
                                 readme_files.append((file_path, problem_id, content))
-                                print(f"✅ 처리 대상에 추가: {file_path} (문제 #{problem_id})")
+                                print(f"🔍 발견: {file_path} (문제 #{problem_id})")
                 except Exception as e:
                     print(f"⚠️ 파일 읽기 실패 {file_path}: {e}")
     
@@ -229,10 +264,9 @@ def main():
         baekjoon_info = get_problem_info_from_baekjoon(problem_id)
         
         if not baekjoon_info:
-            print(f"  ❌ 문제 #{problem_id} 내용을 가져올 수 없습니다.")
-            continue
+            print(f"  ⚠️ 백준 스크래핑 실패 - solved.ac 정보만으로 README 생성")
         
-        # README 내용 생성
+        # README 내용 생성 (baekjoon_info가 None이어도 처리)
         print("  📝 README 내용 생성 중...")
         readme_content = generate_readme_content(problem_info, baekjoon_info, existing_content)
         
