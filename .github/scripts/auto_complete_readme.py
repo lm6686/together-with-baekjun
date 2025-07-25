@@ -172,19 +172,25 @@ def find_readme_files_with_problem_numbers():
         for file in files:
             if file == 'README.md':
                 file_path = os.path.join(root, file)
+                print(f"📂 검사 중: {file_path}")
                 try:
                     with open(file_path, 'r', encoding='utf-8') as f:
                         content = f.read()
                         # [#숫자] 패턴 찾기 (단독으로 있는 경우만)
                         lines = content.split('\n')
                         first_few_lines = '\n'.join(lines[:5])  # 처음 5줄만 확인
-                        match = re.search(r'^\[#(\d+)\]$', first_few_lines, re.MULTILINE)
+                        print(f"   처음 5줄:\n{first_few_lines}")
+                        match = re.search(r'^#\s*\[#(\d+)\]$', first_few_lines, re.MULTILINE)
+                        print(f"   정규식 매치 결과: {match}")
                         if match:
                             problem_id = match.group(1)
+                            print(f"🔍 [#문제번호] 패턴 발견: {file_path} (문제 #{problem_id})")
                             # 이미 완성된 README인지 확인 (문제 정보가 있는지)
-                            if not re.search(r'## 📍 문제 정보', content):
+                            has_problem_info = re.search(r'## 📍 문제 정보', content)
+                            print(f"   📍 문제 정보 섹션 존재: {'Yes' if has_problem_info else 'No'}")
+                            if not has_problem_info:
                                 readme_files.append((file_path, problem_id, content))
-                                print(f"🔍 발견: {file_path} (문제 #{problem_id})")
+                                print(f"✅ 처리 대상에 추가: {file_path} (문제 #{problem_id})")
                 except Exception as e:
                     print(f"⚠️ 파일 읽기 실패 {file_path}: {e}")
     
