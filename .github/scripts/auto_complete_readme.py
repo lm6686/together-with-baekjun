@@ -99,9 +99,15 @@ def generate_readme_content(problem_info, baekjoon_info, existing_content=""):
         if solve_match:
             existing_solve_info = solve_match.group(1).strip()
         
-        process_match = re.search(r'## 💭 풀이 과정 \(ETC\)(.*?)(?=##|---|\Z)', existing_content, re.DOTALL)
+        process_match = re.search(r'## 💭 풀이 과정(.*?)(?=##|---|\Z)', existing_content, re.DOTALL)
         if process_match:
             existing_process = process_match.group(1).strip()
+        
+        # 풀이 핵심도 추가로 추출
+        core_match = re.search(r'## 🔥 풀이 핵심(.*?)(?=##|---|\Z)', existing_content, re.DOTALL)
+        existing_core = ""
+        if core_match:
+            existing_core = core_match.group(1).strip()
     
     readme_content = f"""[#{problem_id}. {title}](https://www.acmicpc.net/problem/{problem_id})
 <img src="https://static.solved.ac/tier_small/{level}.svg" width="16" height="16">
@@ -145,9 +151,13 @@ def generate_readme_content(problem_info, baekjoon_info, existing_content=""):
 
 ---
 
-## 💭 풀이 과정 (ETC)
+## 💭 풀이 과정
 
-{existing_process if existing_process else '> '}
+{existing_process if existing_process else '> 여기에 풀이 과정을 작성하세요.'}
+
+## 🔥 풀이 핵심
+
+{existing_core if existing_core else '> 여기에 풀이 핵심을 작성하세요.'}
 """
     
     return readme_content
